@@ -3,8 +3,10 @@
   "version": "1.0.0",
   "description": "MyFestival - ระบบฝากคำอวยพรตามเทศกาลสไตล์ Sketchbook",
   "main": "index.html",
+  "type": "module",
   "scripts": {
-    "dev": "vite"
+    "dev": "vite",
+    "build": "vite build && node copy-assets.js"
   },
   "keywords": [],
   "author": "",
