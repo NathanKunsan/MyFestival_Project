@@ -28,10 +28,14 @@ values (
     0
 ) on conflict (id) do nothing;
 
--- Ensure role is 'contributor'
-update public.profiles 
-set role = 'contributor' 
-where id = '00000000-0000-0000-0000-000000000000';
+-- Ensure dummy profile exists in public.profiles (in case auth.users exists but profiles was cleared)
+insert into public.profiles (id, email, full_name, role)
+values (
+    '00000000-0000-0000-0000-000000000000',
+    'system@myfestival.local',
+    'ผู้แบ่งปันความสุข',
+    'contributor'
+) on conflict (id) do update set role = 'contributor';
 
 -- 2. Seed Festivals (8 festivals for V1)
 -- One festival is active in June 2026 for testing (Songkran set to June 1 to June 15, 2026)
