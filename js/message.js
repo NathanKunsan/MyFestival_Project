@@ -40,6 +40,12 @@ export const init = async (params) => {
       
     if (festival) {
       currentFestival = festival;
+      const now = new Date();
+      const startDate = new Date(festival.start_date);
+      if (startDate > now) {
+        renderErrorState('เทศกาลนี้ยังไม่ถึงเวลาเริ่มจัดงาน ไม่สามารถสุ่มเปิดรับคำอวยพรล่วงหน้าได้ครับ ⏳');
+        return;
+      }
       document.getElementById('festival-title').textContent = `🎈 ${festival.name}`;
       await drawRandomMessage(festival.id);
     } else {
@@ -80,6 +86,15 @@ async function loadSpecificMessage(messageId) {
     
     currentMessage = message;
     currentFestival = message.festivals;
+    
+    if (currentFestival) {
+      const now = new Date();
+      const startDate = new Date(currentFestival.start_date);
+      if (startDate > now) {
+        renderErrorState('เทศกาลของคำอวยพรนี้ยังไม่ถึงเวลาเริ่มจัดงาน ไม่สามารถเข้าชมได้ครับ ⏳');
+        return;
+      }
+    }
     
     document.getElementById('festival-title').textContent = `🎈 ${currentFestival.name}`;
     await renderMessageCard();
