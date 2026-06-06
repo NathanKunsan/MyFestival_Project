@@ -625,6 +625,24 @@ function setupSuggestModalEvents() {
     }
   });
   
+  // Initialize Date Pickers for Festival Suggestions
+  if (document.getElementById('suggest-start-date')) {
+    flatpickr('#suggest-start-date', {
+      enableTime: false,
+      dateFormat: 'Y-m-d',
+      locale: 'th',
+      defaultDate: new Date()
+    });
+  }
+  if (document.getElementById('suggest-end-date')) {
+    flatpickr('#suggest-end-date', {
+      enableTime: false,
+      dateFormat: 'Y-m-d',
+      locale: 'th',
+      defaultDate: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000)
+    });
+  }
+  
   form?.addEventListener('submit', async (e) => {
     e.preventDefault();
     const supabase = await getSupabase();
@@ -635,6 +653,8 @@ function setupSuggestModalEvents() {
     const wish = document.getElementById('suggest-wish-input').value.trim();
     const sig = sigInput.value.trim();
     const anonymous = anonCheckbox.checked;
+    const startDateVal = document.getElementById('suggest-start-date').value;
+    const endDateVal = document.getElementById('suggest-end-date').value;
     
     const submitBtn = form.querySelector('button[type="submit"]');
     const origText = submitBtn.textContent;
@@ -652,6 +672,8 @@ function setupSuggestModalEvents() {
           is_anonymous: anonymous,
           suggested_by: currentUserId,
           image_url: suggestImageBase64,
+          start_date: startDateVal ? new Date(startDateVal).toISOString() : null,
+          end_date: endDateVal ? new Date(endDateVal).toISOString() : null,
           status: 'pending'
         });
         
