@@ -97,6 +97,15 @@
                 🎡 เสนอชื่อเทศกาลใหม่
               </button>
             </div>
+
+            <!-- ตัวกรองสถานะข้อความ -->
+            <div class="flex gap-1.5 mb-4 flex-wrap pb-2 border-b border-pencil-soft">
+              <span class="text-xs font-bold text-pencil-light self-center mr-1 select-none">ตัวกรอง:</span>
+              <button id="filter-all" class="sketch-btn btn-yellow text-xs py-1 px-2.5 shadow-[1.5px_1.5px_0px_0px_#4a3c31] active:translate-x-[0.5px] active:translate-y-[0.5px] active:shadow-none">📂 ทั้งหมด</button>
+              <button id="filter-approved" class="sketch-btn btn-cream text-xs py-1 px-2.5 shadow-[1.5px_1.5px_0px_0px_#4a3c31] active:translate-x-[0.5px] active:translate-y-[0.5px] active:shadow-none">✅ อนุมัติแล้ว</button>
+              <button id="filter-pending" class="sketch-btn btn-cream text-xs py-1 px-2.5 shadow-[1.5px_1.5px_0px_0px_#4a3c31] active:translate-x-[0.5px] active:translate-y-[0.5px] active:shadow-none">⏳ รอตรวจสอบ</button>
+              <button id="filter-rejected" class="sketch-btn btn-cream text-xs py-1 px-2.5 shadow-[1.5px_1.5px_0px_0px_#4a3c31] active:translate-x-[0.5px] active:translate-y-[0.5px] active:shadow-none">❌ ถูกปฏิเสธ</button>
+            </div>
             
             <div id="contributor-msg-list" class="space-y-4">
               <!-- Populated by JS -->
