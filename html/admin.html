@@ -44,6 +44,9 @@
         <button id="tab-stats" class="admin-tab sketch-btn btn-cream py-1 px-2.5 sm:py-1.5 sm:px-4 text-xs sm:text-sm md:text-base font-bold">
           📊 สถิติ & กิจกรรมล่าสุด
         </button>
+        <button id="tab-about" class="admin-tab sketch-btn btn-cream py-1 px-2.5 sm:py-1.5 sm:px-4 text-xs sm:text-sm md:text-base font-bold">
+          📢 จัดการข่าวสาร/เกี่ยวกับ
+        </button>
       </div>
 
       <!-- Content Containers -->
@@ -248,6 +251,48 @@
             </div>
             <div id="members-list-container" class="w-full">
               <!-- Rendered dynamically by JS (Table or Polaroid Cards Grid) -->
+            </div>
+          </div>
+        </div>
+
+        <!-- Tab 6: About Info Management -->
+        <div id="panel-about" class="admin-panel hidden grid grid-cols-1 lg:grid-cols-3 gap-8">
+          <!-- Form to Add/Edit About Info -->
+          <div class="lg:col-span-1">
+            <div class="sketch-card p-6 bg-white shadow-[4px_4px_0px_0px_#4a3c31]">
+              <h2 id="about-form-title" class="text-xl font-extrabold mb-4 pb-2 border-b-2 border-pencil">📢 เพิ่มข้อมูลข่าวสาร/เกี่ยวกับ</h2>
+              <form id="add-about-form" class="space-y-4">
+                <input type="hidden" id="about-id" value="">
+                <div class="flex flex-col gap-1">
+                  <label for="about-title-input" class="font-bold text-sm">หัวข้อ:</label>
+                  <input type="text" id="about-title-input" required placeholder="เช่น ยินดีต้อนรับสู่ MyFestival V2!" class="sketch-input w-full">
+                </div>
+                
+                <div class="flex flex-col gap-1">
+                  <label for="about-content-input" class="font-bold text-sm">เนื้อหา:</label>
+                  <textarea id="about-content-input" required rows="6" placeholder="ระบุเนื้อหารายละเอียดข่าวสาร..." class="sketch-input w-full resize-none"></textarea>
+                </div>
+                
+                <button type="submit" id="btn-submit-about" class="sketch-btn btn-green w-full py-2 text-base font-bold">
+                  บันทึกข้อมูล 💾
+                </button>
+                
+                <div id="edit-about-actions" class="hidden space-y-2 pt-2 border-t-2 border-dashed border-pencil/30">
+                  <button type="button" id="btn-cancel-edit-about" class="sketch-btn btn-cream w-full py-2 text-base font-bold">
+                    ยกเลิกการแก้ไข ❌
+                  </button>
+                </div>
+              </form>
+            </div>
+          </div>
+          
+          <!-- About Info List -->
+          <div class="lg:col-span-2">
+            <div class="sketch-card p-6 bg-white shadow-[4px_4px_0px_0px_#4a3c31] min-h-[450px]">
+              <h2 class="text-xl font-extrabold mb-4 pb-2 border-b-2 border-pencil">📋 รายการข้อมูลข่าวสารทั้งหมดในระบบ</h2>
+              <div id="admin-about-list" class="space-y-4">
+                <!-- Populated by JS -->
+              </div>
             </div>
           </div>
         </div>
