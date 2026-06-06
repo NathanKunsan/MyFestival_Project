@@ -119,8 +119,8 @@
       </div>
 
       <!-- Edit Message Modal -->
-      <div id="edit-message-modal" class="hidden fixed inset-0 z-50 flex items-center justify-center bg-black/60 px-4">
-        <div class="sketch-card p-6 max-w-lg w-full bg-white relative">
+      <div id="edit-message-modal" class="hidden fixed inset-0 z-50 flex items-center justify-center bg-black/60 px-4 py-6">
+        <div class="sketch-card p-6 max-w-lg w-full bg-white relative max-h-[90vh] overflow-y-auto">
           <h3 class="text-2xl font-extrabold mb-2">✏️ แก้ไขคำอวยพร</h3>
           <p id="edit-notice" class="text-pencil-light text-xs mb-4">
             💡 หากข้อความนี้ได้รับการอนุมัติแล้ว การแก้ไขจะสร้าง "รายการขออนุมัติทบทวนใหม่ (Revision)" โดยข้อความเดิมจะยังคงแสดงในระบบจนกว่าการแก้ไขนี้จะได้รับการอนุมัติ
@@ -168,8 +168,8 @@
       </div>
 
       <!-- Suggest Festival Modal -->
-      <div id="suggest-festival-modal" class="hidden fixed inset-0 z-50 flex items-center justify-center bg-black/60 px-4">
-        <div class="sketch-card p-6 max-w-lg w-full bg-white relative">
+      <div id="suggest-festival-modal" class="hidden fixed inset-0 z-50 flex items-center justify-center bg-black/60 px-4 py-6">
+        <div class="sketch-card p-6 max-w-lg w-full bg-white relative max-h-[90vh] overflow-y-auto">
           <h3 class="text-2xl font-extrabold mb-2">🎡 เสนอชื่อเทศกาลใหม่</h3>
           <p class="text-pencil-light text-xs mb-4">
             💡 ส่งข้อเสนอแนะเพื่อเพิ่มเทศกาลใหม่ที่คุณชอบเข้าสู่ระบบ เมื่อผู้ดูแลระบบอนุมัติ คำอวยพรออริจินัลของคุณจะถูกเผยแพร่พร้อมกับประเพณีใหม่นั้นทันที
@@ -184,6 +184,15 @@
             <div class="flex flex-col gap-1">
               <label for="suggest-desc-input" class="font-bold text-sm">รายละเอียด/คำอธิบายเทศกาล:</label>
               <textarea id="suggest-desc-input" required rows="3" placeholder="อธิบายประเพณีหรือเทศกาลนี้โดยย่อ..." class="sketch-input w-full resize-none"></textarea>
+            </div>
+
+            <div class="flex flex-col gap-1">
+              <label for="suggest-image-input" class="font-bold text-sm">รูปภาพประกอบเทศกาล (ไม่บังคับ, แนะนำขนาด 800x533 px):</label>
+              <input type="file" id="suggest-image-input" accept="image/*" class="sketch-input w-full">
+              <div id="suggest-image-preview-container" class="hidden mt-2 border-2 border-pencil rounded-lg overflow-hidden max-w-xs relative bg-white">
+                <img id="suggest-image-preview" class="w-full h-auto object-cover max-h-40" alt="ตัวอย่างภาพเทศกาล">
+                <button type="button" id="btn-remove-suggest-image" class="absolute top-1 right-1 bg-wood-red border-2 border-pencil text-pencil font-bold text-xs rounded-full w-5 h-5 flex items-center justify-center shadow-[1px_1px_0px_0px_#4a3c31]">×</button>
+              </div>
             </div>
 
             <div class="flex flex-col gap-1">
