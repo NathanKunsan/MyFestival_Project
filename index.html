@@ -74,13 +74,17 @@
         <!-- Auth Dependent Links -->
         <a href="/saved" id="nav-saved" class="hidden px-3 py-1.5 rounded-lg hover:bg-wood-yellow/30 transition duration-150">ที่บันทึกไว้</a>
         <a href="/contributor" id="nav-contributor" class="hidden px-3 py-1.5 rounded-lg hover:bg-wood-yellow/30 transition duration-150">ผู้เขียนคำอวยพร</a>
-        <a href="/admin" id="nav-admin" class="hidden px-3 py-1.5 rounded-lg hover:bg-wood-yellow/30 transition duration-150">ผู้ดูแลระบบ</a>
+        <a href="/admin" id="nav-admin" class="hidden px-3 py-1.5 rounded-lg hover:bg-wood-yellow/30 transition duration-150 flex items-center gap-2">
+          <span>ผู้ดูแลระบบ</span>
+          <span id="admin-notif-badge" class="hidden bg-wood-red border-2 border-pencil text-pencil text-[10px] font-black w-5 h-5 rounded-full flex items-center justify-center shadow-[1px_1px_0px_0px_#4a3c31]">0</span>
+        </a>
         
         <!-- User Info / Actions -->
         <div id="nav-auth-group" class="flex flex-col lg:flex-row items-stretch lg:items-center gap-2 border-t-2 lg:border-t-0 lg:border-l-2 border-pencil/30 pt-2 lg:pt-0 pl-0 lg:pl-4">
           <a href="/profile" id="nav-profile" class="hidden px-3 py-1.5 rounded-lg hover:bg-wood-yellow/30 transition duration-150 flex items-center gap-2">
             <img id="nav-avatar" class="w-8 h-8 rounded-full border-2 border-pencil" src="" alt="avatar" onerror="this.src='https://api.dicebear.com/7.x/fun-emoji/svg?seed=guest'">
             <span id="nav-username">โปรไฟล์</span>
+            <span id="profile-notif-badge" class="hidden bg-wood-red border-2 border-pencil text-pencil text-[10px] font-black w-5 h-5 rounded-full flex items-center justify-center shadow-[1px_1px_0px_0px_#4a3c31]">0</span>
           </a>
           <a href="/login" id="nav-login" class="px-3 py-1.5 rounded-lg hover:bg-wood-yellow/30 transition duration-150">เข้าสู่ระบบ</a>
           <a href="/register" id="nav-register" class="px-3 py-1.5 rounded-lg hover:bg-wood-yellow/30 transition duration-150">สมัครสมาชิก</a>
@@ -129,8 +133,8 @@
   </footer>
 
   <!-- Setup Supabase Configuration Modal (Pop-up if not configured) -->
-  <div id="config-modal" class="hidden fixed inset-0 z-50 flex items-center justify-center bg-black/60 px-4">
-    <div class="sketch-card p-6 md:p-8 max-w-lg w-full bg-white relative">
+  <div id="config-modal" class="hidden fixed inset-0 z-50 flex items-center justify-center bg-black/60 px-4 py-6">
+    <div class="sketch-card p-6 md:p-8 max-w-lg w-full bg-white relative max-h-[90vh] overflow-y-auto">
       <h2 class="text-2xl font-extrabold text-center mb-2">⚙️ ตั้งค่าระบบเชื่อมต่อ Supabase</h2>
       <p class="text-center text-pencil-light text-sm mb-6">กรอกข้อมูล URL และ Key ของ Supabase ของคุณเพื่อเริ่มต้นใช้งานฟีเจอร์ฐานข้อมูล</p>
       
