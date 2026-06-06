@@ -85,16 +85,11 @@ async function fetchArchivedFestivals(supabase) {
       
     if (error) throw error;
     
-    const now = new Date();
-    // Filter only ended festivals (where end_date < now)
-    archivedFestivals = (data || []).filter(f => new Date(f.end_date) < now);
-    
+    archivedFestivals = data || [];
     renderArchiveList(archivedFestivals);
   } catch (error) {
     console.warn('Error fetching archives, using mock data:', error.message);
-    const now = new Date();
-    archivedFestivals = getMockFestivals().filter(f => new Date(f.end_date) < now);
-    
+    archivedFestivals = getMockFestivals();
     renderArchiveList(archivedFestivals);
   }
 }
@@ -107,16 +102,29 @@ function renderArchiveList(list) {
   if (list.length === 0) {
     grid.innerHTML = `
       <div class="col-span-full text-center py-12">
-        <p class="text-lg font-bold text-pencil-light italic">🍂 ไม่พบสารบัญเทศกาลที่สิ้นสุดแล้วตามคำค้นหา</p>
+        <p class="text-lg font-bold text-pencil-light italic">🍂 ไม่พบสารบัญเทศกาลตามคำค้นหา</p>
       </div>
     `;
     return;
   }
   
+  const now = new Date();
+  
   grid.innerHTML = list.map(festival => {
     const approvedCount = festival.messages.filter(m => m.status === 'approved').length;
     const startStr = formatDate(festival.start_date);
     const endStr = formatDate(festival.end_date);
+    const startDate = new Date(festival.start_date);
+    const endDate = new Date(festival.end_date);
+    
+    let statusBadge = '';
+    if (startDate <= now && endDate >= now) {
+      statusBadge = '<span class="sketch-badge btn-green text-[10px] font-black">🔴 ACTIVE</span>';
+    } else if (startDate > now) {
+      statusBadge = '<span class="sketch-badge btn-orange text-[10px] font-black">📅 UPCOMING</span>';
+    } else {
+      statusBadge = '<span class="sketch-badge btn-cream text-[10px] font-black">💾 ARCHIVED</span>';
+    }
     
     return `
       <div class="sketch-card sketch-card-alt p-4 bg-white flex flex-col md:flex-row gap-4 items-center">
@@ -132,7 +140,7 @@ function renderArchiveList(list) {
           <div>
             <div class="flex items-center gap-1.5 flex-wrap">
               <h3 class="text-xl font-extrabold">${festival.name}</h3>
-              <span class="sketch-badge btn-cream text-[10px] font-black">💾 ARCHIVED</span>
+              ${statusBadge}
             </div>
             <p class="text-xs text-pencil-light font-bold">🗓️ ${startStr} - ${endStr}</p>
             <p class="text-sm line-clamp-2 text-pencil-light">${festival.description || ''}</p>
