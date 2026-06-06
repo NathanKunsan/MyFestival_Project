@@ -1,17 +1,27 @@
 // MyFestival - Festival Timeline Controller
 import { getSupabase } from './supabase.js';
 import { navigate, showToast } from './router.js';
+import { getCurrentUser, getUserProfile } from './auth.js';
 
 let festivalsData = [];
 let currentSliderIndex = 0;
 let messagesSubscription = null;
 let festivalsSubscription = null;
 let isInitialLoad = true;
+let userRole = 'guest';
 
 // Initialize Festival Page
 export const init = async () => {
   const supabase = await getSupabase();
   if (!supabase) return;
+  
+  const user = await getCurrentUser();
+  if (user) {
+    const profile = await getUserProfile(user.id);
+    userRole = profile?.role || 'member';
+  } else {
+    userRole = 'guest';
+  }
   
   await fetchAndRenderFestivals(supabase);
   setupSliderEvents();
@@ -154,6 +164,14 @@ function renderCategories() {
   if (endedCount === 0) {
     endedList.innerHTML = `<p class="text-pencil-light font-bold italic col-span-full py-4 text-center">ไม่มีเทศกาลที่จบการบันทึกแล้ว... 💾</p>`;
   }
+
+  // Bind upcoming lock button clicks
+  document.querySelectorAll('.btn-upcoming-lock').forEach(btn => {
+    btn.addEventListener('click', (e) => {
+      e.preventDefault();
+      showToast('เทศกาลนี้ยังไม่เริ่มจัดงาน ไม่สามารถสุ่มคำอวยพรได้ครับ ⏳', 'warning');
+    });
+  });
 }
 
 // Helper to create a single card
@@ -184,9 +202,14 @@ function createFestivalCard(festival, approvedCount) {
       </div>
       
       <div class="mt-4 pt-3 border-t-2 border-pencil-soft flex gap-2">
-        <a href="/message/${festival.id}" class="sketch-btn btn-yellow text-sm flex-1 text-center py-1.5 justify-center">
-          🎲 สุ่มรับคำอวยพร
-        </a>
+        ${new Date(festival.start_date) > new Date()
+          ? `<button class="sketch-btn btn-cream text-sm flex-1 text-center py-1.5 justify-center opacity-60 btn-upcoming-lock">
+               ⏳ ยังไม่เริ่มจัดงาน
+             </button>`
+          : `<a href="/message/${festival.id}" class="sketch-btn btn-yellow text-sm flex-1 text-center py-1.5 justify-center">
+               🎲 สุ่มรับคำอวยพร
+             </a>`
+        }
       </div>
     </div>
   `;
@@ -266,14 +289,35 @@ function updateSliderContent() {
       </p>
       
       <div class="pt-4 flex flex-wrap gap-2">
-        <a href="/message/${festival.id}" class="sketch-btn btn-yellow text-lg py-2.5 px-6">
-          🎲 สุ่มคำอวยพร
-        </a>
-        <a href="/contributor" class="sketch-btn btn-cream py-2.5 px-6">
-          ✍️ ส่งคำอวยพร
-        </a>
+        ${isUpcoming
+          ? `<button class="sketch-btn btn-cream py-2.5 px-6 opacity-60 text-lg btn-upcoming-lock">
+               ⏳ ยังไม่เริ่ม
+             </button>`
+          : `<a href="/message/${festival.id}" class="sketch-btn btn-yellow text-lg py-2.5 px-6">
+               🎲 สุ่มคำอวยพร
+             </a>`
+        }
+        ${(['contributor', 'admin'].includes(userRole) || localStorage.getItem('myfestival_dev_bypass') === 'true')
+          ? `<a href="/contributor" class="sketch-btn btn-cream py-2.5 px-6">
+               ✍️ ส่งคำอวยพร
+             </a>`
+          : ''
+        }
       </div>
     </div>
+
+    <script>
+      // Setup upcoming lock on dynamic elements
+      document.querySelectorAll('.btn-upcoming-lock').forEach(btn => {
+        btn.addEventListener('click', (e) => {
+          e.preventDefault();
+          // We can't access showToast directly inside inline scripts easily, but we handle it via delegated events or global window check:
+          if (window.showToastUpcoming) {
+            window.showToastUpcoming();
+          }
+        });
+      });
+    </script>
   `;
 }
 
