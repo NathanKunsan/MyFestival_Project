@@ -12,8 +12,24 @@ let revisionsSubscription = null;
 let reportsSubscription = null;
 let festivalsSubscription = null;
 let notificationsSubscription = null;
+let suggestionsSubscription = null;
+let currentFestivalImageUrl = null;
+
 
 // Initial Mock Data Fallbacks
+const initialMockSuggestions = [
+  {
+    id: 'mock-sug-1',
+    name: 'วันคริสต์มาส (Christmas)',
+    description: 'วันเฉลิมฉลองคริสต์มาสแสนอบอุ่น ตกแต่งโคมไฟต้นสน และส่งการ์ดอวยพรให้กันในหน้าหนาว',
+    suggested_wish: 'Merry Christmas! ขอให้เทศกาลนี้เต็มไปด้วยความสุข ความรัก และของขวัญกล่องใหญ่ในชีวิตครับ',
+    signature: 'น้องคริส',
+    is_anonymous: false,
+    status: 'pending',
+    profiles: { full_name: 'น้องคริส', email: 'chris@example.com' },
+    created_at: new Date(Date.now() - 3600000 * 3).toISOString()
+  }
+];
 const initialMockWishes = [
   {
     id: 'mock-wish-1',
@@ -191,6 +207,8 @@ export const init = async () => {
   setupRejectionModal();
   setupFestivalForm();
   setupMembersViewToggle();
+  setupRequestEditModal();
+  setupDeleteReasonModal();
   
   // Subscribe to realtime changes on database tables to keep lists updated
   const supabase = await getSupabase();
@@ -212,7 +230,7 @@ export const init = async () => {
       )
       .subscribe();
 
-    // 2. Messages Realtime (Wishes Queue)
+    // 2. Messages Realtime (Wishes Queue and Wishes tab)
     if (messagesSubscription) messagesSubscription.unsubscribe();
     messagesSubscription = supabase
       .channel('admin-messages-changes')
@@ -221,9 +239,12 @@ export const init = async () => {
         { event: '*', schema: 'public', table: 'messages' },
         async (payload) => {
           console.log('Messages change detected:', payload);
-          const tab = document.getElementById('tab-approval');
-          if (tab && tab.classList.contains('btn-yellow')) {
+          const tabApproval = document.getElementById('tab-approval');
+          const tabWishes = document.getElementById('tab-wishes');
+          if (tabApproval && tabApproval.classList.contains('btn-yellow')) {
             await loadApprovalTab();
+          } else if (tabWishes && tabWishes.classList.contains('btn-yellow')) {
+            await loadWishesTab();
           }
         }
       )
@@ -296,6 +317,23 @@ export const init = async () => {
         }
       )
       .subscribe();
+
+    // 7. Festival Suggestions Realtime
+    if (suggestionsSubscription) suggestionsSubscription.unsubscribe();
+    suggestionsSubscription = supabase
+      .channel('admin-suggestions-changes')
+      .on(
+        'postgres_changes',
+        { event: '*', schema: 'public', table: 'festival_suggestions' },
+        async (payload) => {
+          console.log('Suggestions change detected:', payload);
+          const tab = document.getElementById('tab-approval');
+          if (tab && tab.classList.contains('btn-yellow')) {
+            await loadApprovalTab();
+          }
+        }
+      )
+      .subscribe();
   }
   
   // Default load Approval Tab
@@ -335,6 +373,9 @@ function setupTabNavigation() {
       } else if (targetId === 'tab-stats') {
         document.getElementById('panel-stats').classList.remove('hidden');
         await loadStatsTab();
+      } else if (targetId === 'tab-wishes') {
+        document.getElementById('panel-wishes').classList.remove('hidden');
+        await loadWishesTab();
       } else if (targetId === 'tab-members') {
         document.getElementById('panel-members').classList.remove('hidden');
         await loadMembersTab();
@@ -370,15 +411,37 @@ async function loadApprovalTab() {
       .order('created_at', { ascending: true });
       
     if (errRevisions) throw errRevisions;
+
+    const { data: suggestions, error: errSuggestions } = await supabase
+      .from('festival_suggestions')
+      .select('*, profiles(full_name, email)')
+      .eq('status', 'pending')
+      .order('created_at', { ascending: true });
+      
+    if (errSuggestions) throw errSuggestions;
+    
+    const { data: nameChanges, error: errNameChanges } = await supabase
+      .from('profiles')
+      .select('*')
+      .not('pending_name', 'is', null)
+      .order('updated_at', { ascending: true });
+      
+    if (errNameChanges) throw errNameChanges;
     
     renderNewWishesQueue(newWishes);
     renderRevisionsQueue(revisions);
+    renderSuggestionsQueue(suggestions || []);
+    renderNameChangesQueue(nameChanges || []);
   } catch (error) {
     console.warn('Error fetching approval queue, falling back to mock:', error);
     const newWishes = getMockData('wishes', initialMockWishes).filter(w => w.status === 'pending');
     const revisions = getMockData('revisions', initialMockRevisions).filter(r => r.status === 'pending');
+    const suggestions = getMockData('suggestions', initialMockSuggestions).filter(s => s.status === 'pending');
+    const nameChanges = getMockData('name_changes', []).filter(n => n.pending_name);
     renderNewWishesQueue(newWishes);
     renderRevisionsQueue(revisions);
+    renderSuggestionsQueue(suggestions);
+    renderNameChangesQueue(nameChanges);
   }
 }
 
@@ -560,14 +623,19 @@ async function handleApproveRevision(revision) {
   
   if (supabase && !revision.id.startsWith('mock')) {
     try {
+      const updatePayload = {
+        message_text: revision.message_text,
+        signature: revision.signature,
+        is_anonymous: revision.is_anonymous,
+        status: 'approved'
+      };
+      if (revision.festival_id) {
+        updatePayload.festival_id = revision.festival_id;
+      }
+      
       const { error: errUpdateMsg } = await supabase
         .from('messages')
-        .update({
-          message_text: revision.message_text,
-          signature: revision.signature,
-          is_anonymous: revision.is_anonymous,
-          status: 'approved'
-        })
+        .update(updatePayload)
         .eq('id', revision.message_id);
         
       if (!errUpdateMsg) {
@@ -610,6 +678,9 @@ async function handleApproveRevision(revision) {
         wish.message_text = revision.message_text;
         wish.signature = revision.signature;
         wish.is_anonymous = revision.is_anonymous;
+        if (revision.festival_id) {
+          wish.festival_id = revision.festival_id;
+        }
         wish.status = 'approved';
         saveMockData('wishes', wishes);
       }
@@ -921,7 +992,20 @@ async function enterEditFestivalMode(id) {
   document.getElementById('fest-id').value = festival.id;
   document.getElementById('fest-name').value = festival.name;
   document.getElementById('fest-desc').value = festival.description || '';
-  document.getElementById('fest-image').value = festival.image_url || '';
+  
+  // Update image preview
+  currentFestivalImageUrl = festival.image_url || null;
+  const previewContainer = document.getElementById('fest-image-preview-container');
+  const previewImg = document.getElementById('fest-image-preview');
+  if (previewContainer && previewImg) {
+    if (currentFestivalImageUrl) {
+      previewImg.src = currentFestivalImageUrl;
+      previewContainer.classList.remove('hidden');
+    } else {
+      previewImg.src = '';
+      previewContainer.classList.add('hidden');
+    }
+  }
   
   // Format dates for flatpickr input (YYYY-MM-DD HH:MM)
   const formatDateTime = (isoStr) => {
@@ -957,11 +1041,76 @@ function exitEditFestivalMode() {
   document.getElementById('btn-submit-festival').textContent = 'สร้างเทศกาลเข้าระบบ 💾';
   document.getElementById('btn-submit-festival').className = 'sketch-btn btn-green w-full py-2 text-base font-bold';
   document.getElementById('edit-festival-actions').classList.add('hidden');
+  
+  currentFestivalImageUrl = null;
+  const previewContainer = document.getElementById('fest-image-preview-container');
+  const previewImg = document.getElementById('fest-image-preview');
+  if (previewContainer && previewImg) {
+    previewImg.src = '';
+    previewContainer.classList.add('hidden');
+  }
+}
+
+function handleFestivalImageUpload(file) {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = (event) => {
+      const img = new Image();
+      img.onload = () => {
+        const canvas = document.createElement('canvas');
+        canvas.width = 800;
+        canvas.height = 533;
+        const ctx = canvas.getContext('2d');
+        const targetWidth = 800;
+        const targetHeight = 533;
+        const sourceAspect = img.width / img.height;
+        const targetAspect = targetWidth / targetHeight;
+        
+        let srcX = 0, srcY = 0, srcWidth = img.width, srcHeight = img.height;
+        if (sourceAspect > targetAspect) {
+          srcWidth = img.height * targetAspect;
+          srcX = (img.width - srcWidth) / 2;
+        } else {
+          srcHeight = img.width / targetAspect;
+          srcY = (img.height - srcHeight) / 2;
+        }
+        
+        ctx.drawImage(img, srcX, srcY, srcWidth, srcHeight, 0, 0, targetWidth, targetHeight);
+        const dataUrl = canvas.toDataURL('image/jpeg', 0.85);
+        resolve(dataUrl);
+      };
+      img.onerror = () => reject(new Error('รูปภาพไม่ถูกต้อง'));
+      img.src = event.target.result;
+    };
+    reader.onerror = () => reject(new Error('ไม่สามารถอ่านไฟล์ภาพได้'));
+    reader.readAsDataURL(file);
+  });
 }
 
 function setupFestivalForm() {
   const form = document.getElementById('add-festival-form');
   if (!form) return;
+  
+  const fileInput = document.getElementById('fest-image');
+  fileInput?.addEventListener('change', async (e) => {
+    const file = e.target.files[0];
+    if (!file) return;
+    
+    try {
+      const resizedBase64 = await handleFestivalImageUpload(file);
+      currentFestivalImageUrl = resizedBase64;
+      
+      const previewContainer = document.getElementById('fest-image-preview-container');
+      const previewImg = document.getElementById('fest-image-preview');
+      if (previewImg && previewContainer) {
+        previewImg.src = resizedBase64;
+        previewContainer.classList.remove('hidden');
+      }
+    } catch (err) {
+      console.error(err);
+      showToast('ไม่สามารถประมวลผลรูปภาพได้: ' + err.message, 'error');
+    }
+  });
   
   form.addEventListener('submit', async (e) => {
     e.preventDefault();
@@ -970,7 +1119,7 @@ function setupFestivalForm() {
     const id = document.getElementById('fest-id').value;
     const name = document.getElementById('fest-name').value.trim();
     const desc = document.getElementById('fest-desc').value.trim();
-    const image = document.getElementById('fest-image').value.trim();
+    const image = currentFestivalImageUrl;
     const start = document.getElementById('fest-start').value;
     const end = document.getElementById('fest-end').value;
     
@@ -1067,7 +1216,7 @@ function setupFestivalForm() {
         saveMockData('festivals', festivals);
         showToast(`สร้างเทศกาลใหม่ "${name}" สำเร็จแล้ว! (Mock)`, 'success');
       }
-      form.reset();
+      exitEditFestivalMode(); // resets preview and form
     }
     
     submitBtn.disabled = false;
@@ -1447,6 +1596,41 @@ function setupRejectionModal() {
           } else {
             dbError = error;
           }
+        } else if (currentRejectionTarget.type === 'suggestion') {
+          // Reject Festival Suggestion
+          const { error } = await supabase
+            .from('festival_suggestions')
+            .update({ status: 'rejected' })
+            .eq('id', currentRejectionTarget.id);
+            
+          if (!error) {
+            const { data: sugObj } = await supabase
+              .from('festival_suggestions')
+              .select('suggested_by, name')
+              .eq('id', currentRejectionTarget.id)
+              .single();
+              
+            if (sugObj?.suggested_by) {
+              await supabase
+                .from('notifications')
+                .insert({
+                  user_id: sugObj.suggested_by,
+                  title: '❌ ข้อเสนอแนะเทศกาลของคุณไม่ได้รับการอนุมัติ',
+                  content: `ข้อเสนอแนะเทศกาล "${sugObj.name}" ถูกปฏิเสธเนื่องจาก: ${reason}`,
+                  type: 'rejection'
+                });
+            }
+            
+            await supabase.from('activity_logs').insert({
+              user_id: currentUserId,
+              action: 'reject_festival_suggestion',
+              details: { suggestion_id: currentRejectionTarget.id, reason }
+            });
+            dbSuccess = true;
+            showToast('ปฏิเสธข้อเสนอแนะเทศกาลนี้เรียบร้อย', 'info');
+          } else {
+            dbError = error;
+          }
         }
       } catch (error) {
         dbError = error;
@@ -1490,6 +1674,23 @@ function setupRejectionModal() {
           });
           saveMockData('logs', logs);
           showToast('ปฏิเสธและปัดตกการเสนอขอแก้ไขเรียบร้อย (Mock)', 'info');
+        }
+      } else if (currentRejectionTarget.type === 'suggestion') {
+        const suggestions = getMockData('suggestions', initialMockSuggestions);
+        const sug = suggestions.find(s => s.id === currentRejectionTarget.id);
+        if (sug) {
+          sug.status = 'rejected';
+          saveMockData('suggestions', suggestions);
+          
+          const logs = getMockData('logs', initialMockLogs);
+          logs.unshift({
+            id: `log-mock-${Date.now()}`,
+            created_at: new Date().toISOString(),
+            action: 'reject_festival_suggestion',
+            profiles: { full_name: 'นารธาร คุณสาร', email: '6nathan.dev@gmail.com' }
+          });
+          saveMockData('logs', logs);
+          showToast('ปฏิเสธข้อเสนอแนะเทศกาลนี้เรียบร้อย (Mock)', 'info');
         }
       }
     }
@@ -1753,6 +1954,631 @@ async function handleDeleteMember(profileId) {
   await loadMembersTab();
 }
 
+function renderSuggestionsQueue(suggestions) {
+  const container = document.getElementById('queue-suggestions');
+  if (!container) return;
+  
+  if (suggestions.length === 0) {
+    container.innerHTML = `<p class="text-pencil-light font-bold italic text-center py-6">ไม่มีข้อเสนอแนะนำเทศกาลใหม่ในคิว... 🕊️</p>`;
+    return;
+  }
+  
+  container.innerHTML = suggestions.map(sug => {
+    const suggesterName = sug.profiles?.full_name || sug.profiles?.email || 'นิรนาม';
+    const sig = sug.is_anonymous ? 'ส่งแบบนิรนาม' : sug.signature || 'ไม่ได้ระบุ';
+    
+    return `
+      <div class="sketch-card p-4 bg-white shadow-[2px_2px_0px_0px_#4a3c31] space-y-4">
+        <div class="flex justify-between items-center flex-wrap gap-2">
+          <span class="sketch-badge btn-yellow text-[10px] font-black">🎡 เสนอเทศกาล</span>
+          <span class="text-xs text-pencil-light font-bold">✍️ ผู้เสนอ: ${suggesterName} (ลายเซ็น: ${sig})</span>
+        </div>
+        
+        <div class="space-y-2">
+          <p class="text-lg font-extrabold text-wood-orange">🎪 ชื่อที่เสนอ: ${sug.name}</p>
+          <p class="text-sm font-bold text-pencil-light">📝 คำอธิบาย: ${sug.description}</p>
+          <div class="bg-wood-yellow/10 border-2 border-pencil p-3 rounded-lg">
+            <p class="text-xs text-pencil-light font-black uppercase mb-1">คำอวยพรร่วมสร้างชิ้นแรก:</p>
+            <p class="text-sm font-bold italic text-pencil">"${sug.suggested_wish}"</p>
+          </div>
+        </div>
+        
+        <div class="flex gap-2 justify-end">
+          <button data-id="${sug.id}" class="btn-approve-sug sketch-btn btn-green text-xs py-1 px-3 font-bold">
+            อนุมัติเทศกาล 👍
+          </button>
+          <button data-id="${sug.id}" class="btn-reject-sug sketch-btn btn-red text-xs py-1 px-3 font-bold">
+            ปฏิเสธ
+          </button>
+        </div>
+      </div>
+    `;
+  }).join('');
+  
+  // Attach event listeners
+  container.querySelectorAll('.btn-approve-sug').forEach(btn => {
+    btn.addEventListener('click', async (e) => {
+      const id = e.target.getAttribute('data-id');
+      const sug = suggestions.find(s => s.id === id);
+      if (sug) await handleApproveSuggestion(sug);
+    });
+  });
+  
+  container.querySelectorAll('.btn-reject-sug').forEach(btn => {
+    btn.addEventListener('click', (e) => {
+      const id = e.target.getAttribute('data-id');
+      openRejectionModal(id, 'suggestion');
+    });
+  });
+}
+
+function renderNameChangesQueue(nameChanges) {
+  const container = document.getElementById('queue-name-changes');
+  if (!container) return;
+  
+  if (nameChanges.length === 0) {
+    container.innerHTML = `<p class="text-pencil-light font-bold italic text-center py-6">ไม่มีคำร้องขอเปลี่ยนชื่อสมาชิกในคิว... 🕊️</p>`;
+    return;
+  }
+  
+  container.innerHTML = nameChanges.map(profile => {
+    const origName = profile.full_name || 'ไม่ได้ระบุ';
+    const pendingName = profile.pending_name;
+    const email = profile.email;
+    
+    return `
+      <div class="sketch-card p-4 bg-white shadow-[2px_2px_0px_0px_#4a3c31] flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
+        <div class="space-y-1">
+          <div class="flex items-center gap-2 flex-wrap">
+            <span class="sketch-badge btn-cream text-[10px] font-black">👤 บัญชี: ${email}</span>
+          </div>
+          <div class="flex items-center gap-2 text-sm font-bold">
+            <span class="text-pencil-light line-through">${origName}</span>
+            <span class="text-pencil">➡️</span>
+            <span class="text-wood-green underline decoration-wavy decoration-wood-yellow font-extrabold">${pendingName}</span>
+          </div>
+        </div>
+        
+        <div class="flex gap-2 self-end md:self-center">
+          <button data-id="${profile.id}" class="btn-approve-name sketch-btn btn-green text-xs py-1 px-3">
+            อนุมัติ
+          </button>
+          <button data-id="${profile.id}" class="btn-reject-name sketch-btn btn-red text-xs py-1 px-3">
+            ปฏิเสธ
+          </button>
+        </div>
+      </div>
+    `;
+  }).join('');
+  
+  // Attach event listeners
+  container.querySelectorAll('.btn-approve-name').forEach(btn => {
+    btn.addEventListener('click', async (e) => {
+      const id = e.target.getAttribute('data-id');
+      const profile = nameChanges.find(p => p.id === id);
+      if (profile) await handleApproveNameChange(profile);
+    });
+  });
+  
+  container.querySelectorAll('.btn-reject-name').forEach(btn => {
+    btn.addEventListener('click', async (e) => {
+      const id = e.target.getAttribute('data-id');
+      const profile = nameChanges.find(p => p.id === id);
+      if (profile) await handleRejectNameChange(profile);
+    });
+  });
+}
+
+async function handleApproveNameChange(profile) {
+  const supabase = await getSupabase();
+  let dbSuccess = false;
+  let dbError = null;
+  
+  if (supabase && !profile.id.startsWith('mock')) {
+    try {
+      const { error: errUpdate } = await supabase
+        .from('profiles')
+        .update({
+          full_name: profile.pending_name,
+          pending_name: null
+        })
+        .eq('id', profile.id);
+        
+      if (!errUpdate) {
+        dbSuccess = true;
+        await supabase.from('notifications').insert({
+          user_id: profile.id,
+          title: '✅ อนุมัติการเปลี่ยนชื่อสำเร็จ!',
+          content: `ชื่อเล่น/นามปากกาของคุณถูกเปลี่ยนเป็น "${profile.pending_name}" ตามคำขอแล้ว`,
+          type: 'approval'
+        });
+        
+        await supabase.from('activity_logs').insert({
+          user_id: currentUserId,
+          action: 'approve_name_change',
+          details: { profile_id: profile.id, new_name: profile.pending_name }
+        });
+        
+        showToast('อนุมัติการเปลี่ยนชื่อเรียบร้อยแล้ว!', 'success');
+      } else {
+        dbError = errUpdate;
+      }
+    } catch (error) {
+      dbError = error;
+    }
+  }
+  
+  if (!dbSuccess) {
+    console.warn('DB approve name change failed, using mock:', dbError?.message);
+    const mockProfiles = getMockData('name_changes', []);
+    const p = mockProfiles.find(x => x.id === profile.id);
+    if (p) {
+      p.full_name = p.pending_name;
+      p.pending_name = null;
+      saveMockData('name_changes', mockProfiles);
+      showToast('อนุมัติการเปลี่ยนชื่อเรียบร้อยแล้ว! (Mock)', 'success');
+    }
+  }
+  
+  await loadApprovalTab();
+}
+
+async function handleRejectNameChange(profile) {
+  const supabase = await getSupabase();
+  let dbSuccess = false;
+  let dbError = null;
+  
+  if (supabase && !profile.id.startsWith('mock')) {
+    try {
+      const { error: errUpdate } = await supabase
+        .from('profiles')
+        .update({
+          pending_name: null
+        })
+        .eq('id', profile.id);
+        
+      if (!errUpdate) {
+        dbSuccess = true;
+        await supabase.from('notifications').insert({
+          user_id: profile.id,
+          title: '❌ ปฏิเสธการเปลี่ยนชื่อ',
+          content: `คำขอเปลี่ยนชื่อเป็น "${profile.pending_name}" ถูกปฏิเสธโดยผู้ดูแลระบบ`,
+          type: 'rejection'
+        });
+        
+        await supabase.from('activity_logs').insert({
+          user_id: currentUserId,
+          action: 'reject_name_change',
+          details: { profile_id: profile.id, requested_name: profile.pending_name }
+        });
+        
+        showToast('ปฏิเสธการเปลี่ยนชื่อเรียบร้อยแล้ว!', 'info');
+      } else {
+        dbError = errUpdate;
+      }
+    } catch (error) {
+      dbError = error;
+    }
+  }
+  
+  if (!dbSuccess) {
+    console.warn('DB reject name change failed, using mock:', dbError?.message);
+    const mockProfiles = getMockData('name_changes', []);
+    const p = mockProfiles.find(x => x.id === profile.id);
+    if (p) {
+      p.pending_name = null;
+      saveMockData('name_changes', mockProfiles);
+      showToast('ปฏิเสธการเปลี่ยนชื่อเรียบร้อยแล้ว! (Mock)', 'info');
+    }
+  }
+  
+  await loadApprovalTab();
+}
+
+
+async function handleApproveSuggestion(sug) {
+  const supabase = await getSupabase();
+  let dbSuccess = false;
+  let dbError = null;
+  
+  const startDate = new Date();
+  const endDate = new Date();
+  endDate.setDate(startDate.getDate() + 7); // Active for 7 days
+  
+  if (supabase && !sug.id.startsWith('mock')) {
+    try {
+      // 1. Insert festival
+      const { data: newFest, error: errFest } = await supabase
+        .from('festivals')
+        .insert({
+          name: sug.name,
+          description: sug.description,
+          image_url: 'https://images.unsplash.com/photo-1513151233558-d860c5398176?w=800',
+          start_date: startDate.toISOString(),
+          end_date: endDate.toISOString()
+        })
+        .select()
+        .single();
+        
+      if (errFest) throw errFest;
+      
+      // 2. Insert initial wish message as approved
+      const { error: errWish } = await supabase
+        .from('messages')
+        .insert({
+          festival_id: newFest.id,
+          contributor_id: sug.suggested_by,
+          message_text: sug.suggested_wish,
+          signature: sug.signature || null,
+          is_anonymous: sug.is_anonymous,
+          status: 'approved'
+        });
+        
+      if (errWish) throw errWish;
+      
+      // 3. Update suggestion status
+      const { error: errSug } = await supabase
+        .from('festival_suggestions')
+        .update({ status: 'approved' })
+        .eq('id', sug.id);
+        
+      if (errSug) throw errSug;
+      
+      // Log activity
+      await supabase.from('activity_logs').insert({
+        user_id: currentUserId,
+        action: 'approve_festival_suggestion',
+        details: { suggestion_id: sug.id, festival_id: newFest.id, festival_name: sug.name }
+      });
+      
+      dbSuccess = true;
+      showToast(`อนุมัติเทศกาลใหม่ "${sug.name}" เรียบร้อยแล้ว!`, 'success');
+    } catch (error) {
+      dbError = error;
+    }
+  }
+  
+  if (!dbSuccess) {
+    console.warn('DB approve suggestion failed, using mock:', dbError?.message);
+    const suggestions = getMockData('suggestions', initialMockSuggestions);
+    const targetSug = suggestions.find(s => s.id === sug.id);
+    if (targetSug) {
+      targetSug.status = 'approved';
+      saveMockData('suggestions', suggestions);
+      
+      const festivals = getMockData('festivals', initialMockFestivals);
+      const newFestId = `mock-fest-${Date.now()}`;
+      festivals.unshift({
+        id: newFestId,
+        name: sug.name,
+        description: sug.description,
+        image_url: 'https://images.unsplash.com/photo-1513151233558-d860c5398176?w=800',
+        start_date: startDate.toISOString(),
+        end_date: endDate.toISOString(),
+        messages: []
+      });
+      saveMockData('festivals', festivals);
+      
+      const wishes = getMockData('wishes', initialMockWishes);
+      wishes.unshift({
+        id: `mock-wish-${Date.now()}`,
+        festival_id: newFestId,
+        message_text: sug.suggested_wish,
+        signature: sug.signature,
+        is_anonymous: sug.is_anonymous,
+        status: 'approved',
+        festivals: { name: sug.name },
+        profiles: { full_name: sug.profiles?.full_name || 'ผู้เสนอ', email: sug.profiles?.email || '' },
+        created_at: new Date().toISOString()
+      });
+      saveMockData('wishes', wishes);
+      
+      const logs = getMockData('logs', initialMockLogs);
+      logs.unshift({
+        id: `log-mock-${Date.now()}`,
+        created_at: new Date().toISOString(),
+        action: 'approve_festival_suggestion',
+        profiles: { full_name: 'นารธาร คุณสาร', email: '6nathan.dev@gmail.com' }
+      });
+      saveMockData('logs', logs);
+      
+      showToast(`อนุมัติเทศกาลใหม่ "${sug.name}" เรียบร้อยแล้ว! (Mock)`, 'success');
+    }
+  }
+  await loadApprovalTab();
+}
+
+async function loadWishesTab() {
+  const supabase = await getSupabase();
+  const container = document.getElementById('wishes-list-container');
+  if (!container) return;
+  
+  container.innerHTML = `<p class="text-pencil-light font-bold italic text-center py-6 col-span-full">กำลังโหลดคำอวยพรทั้งหมด... 💌</p>`;
+  
+  let allWishes = [];
+  try {
+    const { data, error } = await supabase
+      .from('messages')
+      .select('*, festivals(name), profiles(full_name, email)')
+      .order('created_at', { ascending: false });
+      
+    if (error) throw error;
+    allWishes = data || [];
+  } catch (error) {
+    console.warn('Error fetching all messages, using mock:', error);
+    allWishes = getMockData('wishes', initialMockWishes);
+  }
+  
+  renderWishesList(allWishes);
+  setupWishesSearch(allWishes);
+}
+
+function renderWishesList(wishes) {
+  const container = document.getElementById('wishes-list-container');
+  if (!container) return;
+  
+  const term = (document.getElementById('wishes-search-input')?.value || '').toLowerCase().trim();
+  let filtered = wishes;
+  if (term) {
+    filtered = wishes.filter(w => 
+      w.message_text.toLowerCase().includes(term) || 
+      (w.signature && w.signature.toLowerCase().includes(term)) ||
+      (w.profiles?.full_name && w.profiles.full_name.toLowerCase().includes(term)) ||
+      (w.profiles?.email && w.profiles.email.toLowerCase().includes(term)) ||
+      (w.festivals?.name && w.festivals.name.toLowerCase().includes(term))
+    );
+  }
+  
+  if (filtered.length === 0) {
+    container.innerHTML = `<p class="text-pencil-light font-bold italic text-center py-6 col-span-full">ไม่พบการ์ดคำอวยพรตามคำค้นหา... 🍃</p>`;
+    return;
+  }
+  
+  container.innerHTML = filtered.map(w => {
+    const writerName = w.profiles?.full_name || w.profiles?.email || 'นิรนาม';
+    const sig = w.is_anonymous ? 'ส่งแบบนิรนาม' : w.signature || 'ไม่ได้ระบุ';
+    const dateStr = new Date(w.created_at).toLocaleString('th-TH');
+    
+    let statusClass = 'btn-yellow';
+    let statusText = '⏳ รออนุมัติ';
+    if (w.status === 'approved') {
+      statusClass = 'btn-green';
+      statusText = '✅ อนุมัติแล้ว';
+    } else if (w.status === 'rejected') {
+      statusClass = 'btn-red';
+      statusText = '❌ ปฏิเสธ/ขอแก้ไข';
+    }
+    
+    return `
+      <div class="sketch-card p-4 bg-white shadow-[2px_2px_0px_0px_#4a3c31] flex flex-col justify-between space-y-3">
+        <div class="space-y-2">
+          <div class="flex justify-between items-start gap-2 flex-wrap">
+            <div class="flex items-center gap-1.5 flex-wrap">
+              <span class="sketch-badge btn-cream text-[10px] font-black">🎈 ${w.festivals?.name || 'ทั่วไป'}</span>
+              <span class="sketch-badge ${statusClass} text-[10px] font-black">${statusText}</span>
+            </div>
+            <span class="text-[10px] text-pencil-light font-bold">${dateStr}</span>
+          </div>
+          <p class="text-sm font-bold italic leading-relaxed">"${w.message_text}"</p>
+          <p class="text-xs text-pencil-light font-bold">✍️ ผู้เขียน: ${writerName} (ลายเซ็น: ${sig})</p>
+          ${w.rejection_reason ? `
+            <p class="text-[11px] font-bold text-wood-orange bg-wood-orange/10 border-2 border-pencil p-2 rounded">
+              📝 บันทึกแอดมิน: ${w.rejection_reason}
+            </p>
+          ` : ''}
+        </div>
+        
+        <div class="flex gap-2 justify-end border-t border-pencil-soft pt-3 mt-1">
+          <button data-id="${w.id}" class="btn-wish-request-edit sketch-btn btn-cream text-xs py-1 px-3">
+            ขอให้แก้ไข 📝
+          </button>
+          <button data-id="${w.id}" class="btn-wish-delete-reason sketch-btn btn-red text-xs py-1 px-3">
+            ลบการ์ด 🗑️
+          </button>
+        </div>
+      </div>
+    `;
+  }).join('');
+  
+  // Attach event listeners
+  container.querySelectorAll('.btn-wish-request-edit').forEach(btn => {
+    btn.addEventListener('click', (e) => {
+      const id = e.target.getAttribute('data-id');
+      openRequestEditModal(id);
+    });
+  });
+  
+  container.querySelectorAll('.btn-wish-delete-reason').forEach(btn => {
+    btn.addEventListener('click', (e) => {
+      const id = e.target.getAttribute('data-id');
+      openDeleteReasonModal(id);
+    });
+  });
+}
+
+function setupWishesSearch(allWishes) {
+  const searchInput = document.getElementById('wishes-search-input');
+  if (!searchInput) return;
+  
+  searchInput.oninput = () => {
+    renderWishesList(allWishes);
+  };
+}
+
+function setupRequestEditModal() {
+  document.getElementById('btn-close-request-edit')?.addEventListener('click', () => {
+    document.getElementById('request-edit-modal').classList.add('hidden');
+    document.getElementById('request-edit-target-id').value = '';
+    document.getElementById('request-edit-reason-input').value = '';
+  });
+  
+  const form = document.getElementById('request-edit-form');
+  form?.addEventListener('submit', async (e) => {
+    e.preventDefault();
+    const id = document.getElementById('request-edit-target-id').value;
+    const reason = document.getElementById('request-edit-reason-input').value.trim();
+    if (!id || !reason) return;
+    
+    const submitBtn = form.querySelector('button[type="submit"]');
+    const origText = submitBtn.textContent;
+    submitBtn.disabled = true;
+    submitBtn.textContent = 'กำลังส่งคำขอ...';
+    
+    const supabase = await getSupabase();
+    let dbSuccess = false;
+    let dbError = null;
+    
+    if (supabase && !id.startsWith('mock')) {
+      try {
+        const { error } = await supabase
+          .from('messages')
+          .update({
+            status: 'rejected',
+            rejection_reason: reason
+          })
+          .eq('id', id);
+          
+        if (!error) {
+          await supabase.from('activity_logs').insert({
+            user_id: currentUserId,
+            action: 'request_edit_message',
+            details: { message_id: id, reason }
+          });
+          dbSuccess = true;
+          showToast('ส่งคำขอขอให้ผู้เขียนแก้ไขข้อความเรียบร้อย!', 'success');
+        } else {
+          dbError = error;
+        }
+      } catch (error) {
+        dbError = error;
+      }
+    }
+    
+    if (!dbSuccess) {
+      console.warn('DB request edit failed, using mock:', dbError?.message);
+      const wishes = getMockData('wishes', initialMockWishes);
+      const wish = wishes.find(w => w.id === id);
+      if (wish) {
+        wish.status = 'rejected';
+        wish.rejection_reason = reason;
+        saveMockData('wishes', wishes);
+        showToast('ส่งคำขอขอให้ผู้เขียนแก้ไขข้อความเรียบร้อย! (Mock)', 'success');
+      }
+    }
+    
+    document.getElementById('request-edit-modal').classList.add('hidden');
+    document.getElementById('request-edit-target-id').value = '';
+    document.getElementById('request-edit-reason-input').value = '';
+    submitBtn.disabled = false;
+    submitBtn.textContent = origText;
+    await loadWishesTab();
+  });
+}
+
+function openRequestEditModal(id) {
+  document.getElementById('request-edit-target-id').value = id;
+  document.getElementById('request-edit-modal').classList.remove('hidden');
+}
+
+function setupDeleteReasonModal() {
+  document.getElementById('btn-close-delete-reason')?.addEventListener('click', () => {
+    document.getElementById('delete-reason-modal').classList.add('hidden');
+    document.getElementById('delete-reason-target-id').value = '';
+    document.getElementById('delete-reason-input').value = '';
+  });
+  
+  const form = document.getElementById('delete-reason-form');
+  form?.addEventListener('submit', async (e) => {
+    e.preventDefault();
+    const id = document.getElementById('delete-reason-target-id').value;
+    const reason = document.getElementById('delete-reason-input').value.trim();
+    if (!id || !reason) return;
+    
+    const submitBtn = form.querySelector('button[type="submit"]');
+    const origText = submitBtn.textContent;
+    submitBtn.disabled = true;
+    submitBtn.textContent = 'กำลังลบการ์ด...';
+    
+    const supabase = await getSupabase();
+    let dbSuccess = false;
+    let dbError = null;
+    
+    if (supabase && !id.startsWith('mock')) {
+      try {
+        const { data: msgObj } = await supabase
+          .from('messages')
+          .select('contributor_id, message_text')
+          .eq('id', id)
+          .single();
+          
+        const { error } = await supabase
+          .from('messages')
+          .delete()
+          .eq('id', id);
+          
+        if (!error) {
+          if (msgObj?.contributor_id) {
+            await supabase
+              .from('notifications')
+              .insert({
+                user_id: msgObj.contributor_id,
+                title: '🗑️ การ์ดคำอวยพรของคุณถูกลบโดยแอดมิน',
+                content: `ข้อความของคุณ: "${msgObj.message_text.substring(0, 30)}..." ถูกลบเนื่องจาก: ${reason}`,
+                type: 'rejection'
+              });
+          }
+          
+          await supabase.from('activity_logs').insert({
+            user_id: currentUserId,
+            action: 'delete_message_by_admin',
+            details: { message_id: id, reason }
+          });
+          dbSuccess = true;
+          showToast('ลบการ์ดคำอวยพรและแจ้งเตือนเหตุผลเรียบร้อยแล้ว!', 'success');
+        } else {
+          dbError = error;
+        }
+      } catch (error) {
+        dbError = error;
+      }
+    }
+    
+    if (!dbSuccess) {
+      console.warn('DB delete with reason failed, using mock:', dbError?.message);
+      const wishes = getMockData('wishes', initialMockWishes);
+      const wishIndex = wishes.findIndex(w => w.id === id);
+      if (wishIndex !== -1) {
+        const wishObj = wishes[wishIndex];
+        wishes.splice(wishIndex, 1);
+        saveMockData('wishes', wishes);
+        
+        const notifications = getMockData('notifications', initialMockNotifications);
+        notifications.unshift({
+          id: `notif-mock-${Date.now()}`,
+          created_at: new Date().toISOString(),
+          title: '🗑️ การ์ดคำอวยพรของคุณถูกลบโดยแอดมิน',
+          content: `ข้อความของคุณ: "${wishObj.message_text.substring(0, 30)}..." ถูกลบเนื่องจาก: ${reason}`
+        });
+        saveMockData('notifications', notifications);
+        
+        showToast('ลบการ์ดคำอวยพรและแจ้งเตือนเหตุผลเรียบร้อยแล้ว! (Mock)', 'success');
+      }
+    }
+    
+    document.getElementById('delete-reason-modal').classList.add('hidden');
+    document.getElementById('delete-reason-target-id').value = '';
+    document.getElementById('delete-reason-input').value = '';
+    submitBtn.disabled = false;
+    submitBtn.textContent = origText;
+    await loadWishesTab();
+  });
+}
+
+function openDeleteReasonModal(id) {
+  document.getElementById('delete-reason-target-id').value = id;
+  document.getElementById('delete-reason-modal').classList.remove('hidden');
+}
+
 export const cleanup = () => {
   console.log('Cleaning up admin realtime subscriptions...');
   if (profilesSubscription) {
@@ -1778,5 +2604,9 @@ export const cleanup = () => {
   if (notificationsSubscription) {
     notificationsSubscription.unsubscribe();
     notificationsSubscription = null;
+  }
+  if (suggestionsSubscription) {
+    suggestionsSubscription.unsubscribe();
+    suggestionsSubscription = null;
   }
 };
