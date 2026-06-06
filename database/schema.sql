@@ -16,6 +16,8 @@ drop table if exists message_revisions cascade;
 drop table if exists messages cascade;
 drop table if exists festivals cascade;
 drop table if exists profiles cascade;
+drop table if exists festival_suggestions cascade;
+drop table if exists about_info cascade;
 
 -- 1. PROFILES Table (Extends auth.users)
 create table profiles (
@@ -137,7 +139,7 @@ create table activity_logs (
 );
 
 -- 12. FESTIVAL SUGGESTIONS Table
-create table festival_suggestions (
+create table if not exists festival_suggestions (
     id uuid primary key default gen_random_uuid(),
     name text not null,
     description text not null,
@@ -146,7 +148,18 @@ create table festival_suggestions (
     is_anonymous boolean default false not null,
     suggested_by uuid references profiles(id) on delete cascade,
     image_url text,
+    start_date timestamp with time zone,
+    end_date timestamp with time zone,
     status text not null default 'pending' check (status in ('pending', 'approved', 'rejected')),
+    created_at timestamp with time zone default now() not null,
+    updated_at timestamp with time zone default now() not null
+);
+
+-- 13. ABOUT INFO Table
+create table if not exists about_info (
+    id uuid primary key default gen_random_uuid(),
+    title text not null,
+    content text not null,
     created_at timestamp with time zone default now() not null,
     updated_at timestamp with time zone default now() not null
 );
@@ -166,6 +179,7 @@ create trigger update_messages_modtime before update on messages for each row ex
 create trigger update_message_revisions_modtime before update on message_revisions for each row execute procedure update_updated_at_column();
 create trigger update_reports_modtime before update on reports for each row execute procedure update_updated_at_column();
 create trigger update_festival_suggestions_modtime before update on festival_suggestions for each row execute procedure update_updated_at_column();
+create trigger update_about_info_modtime before update on about_info for each row execute procedure update_updated_at_column();
 
 -- AUTOMATIC PROFILE CREATION FROM auth.users
 create or replace function public.handle_new_user()
