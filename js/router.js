@@ -28,6 +28,85 @@ const navUsername = document.getElementById('nav-username');
 let currentSession = { user: null, profile: null, role: 'guest' };
 let userProfileSubscription = null;
 let activeControllerModule = null;
+let notifChannels = [];
+
+function clearNotifChannels() {
+  notifChannels.forEach(c => c.unsubscribe());
+  notifChannels = [];
+}
+
+export async function updateProfileNotificationCount(userId) {
+  if (!userId) return;
+  const supabase = await getSupabase();
+  if (!supabase) return;
+  
+  try {
+    const { count, error } = await supabase
+      .from('notifications')
+      .select('*', { count: 'exact', head: true })
+      .eq('user_id', userId)
+      .eq('is_read', false);
+      
+    if (error) throw error;
+    
+    const badge = document.getElementById('profile-notif-badge');
+    if (badge) {
+      if (count > 0) {
+        badge.textContent = count;
+        badge.classList.remove('hidden');
+      } else {
+        badge.classList.add('hidden');
+      }
+    }
+  } catch (err) {
+    console.warn('Error fetching user notification count:', err);
+  }
+}
+
+export async function updateAdminNotificationCount() {
+  const supabase = await getSupabase();
+  if (!supabase) return;
+  
+  try {
+    // 1. Pending wishes
+    const { count: msgCount } = await supabase
+      .from('messages')
+      .select('*', { count: 'exact', head: true })
+      .eq('status', 'pending');
+      
+    // 2. Pending revisions
+    const { count: revCount } = await supabase
+      .from('message_revisions')
+      .select('*', { count: 'exact', head: true })
+      .eq('status', 'pending');
+      
+    // 3. Pending suggestions
+    const { count: sugCount } = await supabase
+      .from('festival_suggestions')
+      .select('*', { count: 'exact', head: true })
+      .eq('status', 'pending');
+      
+    // 4. Pending name changes
+    const { count: nameCount } = await supabase
+      .from('profiles')
+      .select('*', { count: 'exact', head: true })
+      .not('pending_name', 'is', null);
+      
+    const totalTasks = (msgCount || 0) + (revCount || 0) + (sugCount || 0) + (nameCount || 0);
+    
+    const badge = document.getElementById('admin-notif-badge');
+    if (badge) {
+      if (totalTasks > 0) {
+        badge.textContent = totalTasks;
+        badge.classList.remove('hidden');
+      } else {
+        badge.classList.add('hidden');
+      }
+    }
+  } catch (err) {
+    console.warn('Error fetching admin notification count:', err);
+  }
+}
 
 // Initialize App
 document.addEventListener('DOMContentLoaded', async () => {
@@ -190,6 +269,10 @@ function matchRoute(path) {
 
 // Load and render page views
 async function routePage(path) {
+  // Remove previous portaled modals from body (keep global #config-modal)
+  const oldModals = document.body.querySelectorAll('[id$="-modal"]:not(#config-modal)');
+  oldModals.forEach(m => m.remove());
+  
   // If not configured, block navigation and display fallback
   if (!isConfigured()) {
     mainContent.innerHTML = `
@@ -245,6 +328,12 @@ async function routePage(path) {
       } else {
         mainContent.innerHTML = html; // fallback if no container
       }
+      
+      // Move sub-view modals to body to solve z-index issues
+      const modals = mainContent.querySelectorAll('[id$="-modal"]');
+      modals.forEach(modal => {
+        document.body.appendChild(modal);
+      });
       
       // Dynamically load controller module
       if (matched.controller) {
@@ -317,38 +406,94 @@ export async function refreshAuthUI() {
     }
     currentSession = authStatus;
     
-    // Subscribe to realtime updates for this user's profile
-    if (authStatus.user && authStatus.user.id !== 'mock-admin-id' && !userProfileSubscription) {
+    // Subscribe to realtime updates for this user's profile and notifications
+    clearNotifChannels();
+    if (authStatus.user && authStatus.user.id !== 'mock-admin-id') {
       const supabase = await getSupabase();
       if (supabase) {
-        userProfileSubscription = supabase
-          .channel(`user-profile-${authStatus.user.id}`)
-          .on(
-            'postgres_changes',
-            { event: 'UPDATE', schema: 'public', table: 'profiles', filter: `id=eq.${authStatus.user.id}` },
-            async (payload) => {
-              console.log('User profile updated in real-time:', payload.new);
-              if (payload.new && payload.new.role !== currentSession.role) {
-                showToast(`บทบาทผู้ใช้งานของคุณถูกอัปเดตเป็น: ${payload.new.role === 'admin' ? 'Admin' : payload.new.role === 'contributor' ? 'Contributor' : 'Member'}`, 'info');
-                
-                if (payload.new.role !== 'admin' && authStatus.user.email === '6nathan.dev@gmail.com') {
-                  localStorage.removeItem('myfestival_admin_role_override');
-                }
-                
-                await refreshAuthUI();
-                
-                if (window.location.pathname === '/profile') {
-                  routePage('/profile');
-                }
-                
-                const accessDenied = checkAccessGuards(window.location.pathname);
-                if (accessDenied) {
-                  navigate(accessDenied);
+        // Realtime profile details updates
+        if (!userProfileSubscription) {
+          userProfileSubscription = supabase
+            .channel(`user-profile-${authStatus.user.id}`)
+            .on(
+              'postgres_changes',
+              { event: 'UPDATE', schema: 'public', table: 'profiles', filter: `id=eq.${authStatus.user.id}` },
+              async (payload) => {
+                console.log('User profile updated in real-time:', payload.new);
+                if (payload.new && payload.new.role !== currentSession.role) {
+                  showToast(`บทบาทผู้ใช้งานของคุณถูกอัปเดตเป็น: ${payload.new.role === 'admin' ? 'Admin' : payload.new.role === 'contributor' ? 'Contributor' : 'Member'}`, 'info');
+                  
+                  if (payload.new.role !== 'admin' && authStatus.user.email === '6nathan.dev@gmail.com') {
+                    localStorage.removeItem('myfestival_admin_role_override');
+                  }
+                  
+                  await refreshAuthUI();
+                  
+                  if (window.location.pathname === '/profile') {
+                    routePage('/profile');
+                  }
+                  
+                  const accessDenied = checkAccessGuards(window.location.pathname);
+                  if (accessDenied) {
+                    navigate(accessDenied);
+                  }
                 }
               }
+            )
+            .subscribe();
+        }
+
+        // 1. Setup profile notification counts and realtime
+        await updateProfileNotificationCount(authStatus.user.id);
+        const chanNotif = supabase
+          .channel(`nav-notifications-${authStatus.user.id}`)
+          .on(
+            'postgres_changes',
+            { event: '*', schema: 'public', table: 'notifications', filter: `user_id=eq.${authStatus.user.id}` },
+            async () => {
+              await updateProfileNotificationCount(authStatus.user.id);
             }
           )
           .subscribe();
+        notifChannels.push(chanNotif);
+
+        // 2. Setup admin tasks counts and realtime if user is admin
+        const isSystemAdmin = authStatus.user.email === '6nathan.dev@gmail.com' || localStorage.getItem('myfestival_dev_bypass') === 'true';
+        if (authStatus.role === 'admin' || isSystemAdmin) {
+          await updateAdminNotificationCount();
+          
+          const chanAdminMsg = supabase
+            .channel('nav-admin-messages')
+            .on('postgres_changes', { event: '*', schema: 'public', table: 'messages' }, async () => {
+              await updateAdminNotificationCount();
+            })
+            .subscribe();
+          notifChannels.push(chanAdminMsg);
+
+          const chanAdminRev = supabase
+            .channel('nav-admin-revisions')
+            .on('postgres_changes', { event: '*', schema: 'public', table: 'message_revisions' }, async () => {
+              await updateAdminNotificationCount();
+            })
+            .subscribe();
+          notifChannels.push(chanAdminRev);
+
+          const chanAdminSug = supabase
+            .channel('nav-admin-suggestions')
+            .on('postgres_changes', { event: '*', schema: 'public', table: 'festival_suggestions' }, async () => {
+              await updateAdminNotificationCount();
+            })
+            .subscribe();
+          notifChannels.push(chanAdminSug);
+
+          const chanAdminProf = supabase
+            .channel('nav-admin-profiles')
+            .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'profiles' }, async () => {
+              await updateAdminNotificationCount();
+            })
+            .subscribe();
+          notifChannels.push(chanAdminProf);
+        }
       }
     }
     
@@ -403,6 +548,7 @@ navLogout?.addEventListener('click', async () => {
     userProfileSubscription.unsubscribe();
     userProfileSubscription = null;
   }
+  clearNotifChannels();
   await signOut();
 });
 
