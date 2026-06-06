@@ -506,6 +506,44 @@ function setupEditModalEvents() {
   });
 }
 
+let suggestImageBase64 = null;
+
+function handleSuggestImageResize(file) {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = (event) => {
+      const img = new Image();
+      img.onload = () => {
+        const canvas = document.createElement('canvas');
+        canvas.width = 800;
+        canvas.height = 533;
+        const ctx = canvas.getContext('2d');
+        const targetWidth = 800;
+        const targetHeight = 533;
+        const sourceAspect = img.width / img.height;
+        const targetAspect = targetWidth / targetHeight;
+        
+        let srcX = 0, srcY = 0, srcWidth = img.width, srcHeight = img.height;
+        if (sourceAspect > targetAspect) {
+          srcWidth = img.height * targetAspect;
+          srcX = (img.width - srcWidth) / 2;
+        } else {
+          srcHeight = img.width / targetAspect;
+          srcY = (img.height - srcHeight) / 2;
+        }
+        
+        ctx.drawImage(img, srcX, srcY, srcWidth, srcHeight, 0, 0, targetWidth, targetHeight);
+        const dataUrl = canvas.toDataURL('image/jpeg', 0.85);
+        resolve(dataUrl);
+      };
+      img.onerror = () => reject(new Error('รูปภาพไม่ถูกต้อง'));
+      img.src = event.target.result;
+    };
+    reader.onerror = () => reject(new Error('ไม่สามารถอ่านไฟล์ภาพได้'));
+    reader.readAsDataURL(file);
+  });
+}
+
 // Setup suggest festival modal events
 function setupSuggestModalEvents() {
   const modal = document.getElementById('suggest-festival-modal');
@@ -514,9 +552,21 @@ function setupSuggestModalEvents() {
   const form = document.getElementById('suggest-festival-form');
   const sigInput = document.getElementById('suggest-sig-input');
   const anonCheckbox = document.getElementById('suggest-anonymous-checkbox');
+  const fileInput = document.getElementById('suggest-image-input');
+  const previewContainer = document.getElementById('suggest-image-preview-container');
+  const previewImg = document.getElementById('suggest-image-preview');
+  const btnRemoveImage = document.getElementById('btn-remove-suggest-image');
+  
+  const clearSuggestImage = () => {
+    suggestImageBase64 = null;
+    if (fileInput) fileInput.value = '';
+    if (previewContainer) previewContainer.classList.add('hidden');
+    if (previewImg) previewImg.src = '';
+  };
   
   if (btnOpen && modal) {
     btnOpen.addEventListener('click', () => {
+      clearSuggestImage();
       // Pre-fill signature
       if (sigInput && userProfile) {
         sigInput.readOnly = true;
@@ -535,8 +585,33 @@ function setupSuggestModalEvents() {
     btnClose.addEventListener('click', () => {
       modal.classList.add('hidden');
       form?.reset();
+      clearSuggestImage();
     });
   }
+
+  fileInput?.addEventListener('change', async (e) => {
+    const file = e.target.files[0];
+    if (!file) return;
+    
+    try {
+      showToast('กำลังประมวลผลและบีบอัดรูปภาพ...', 'info');
+      const base64 = await handleSuggestImageResize(file);
+      suggestImageBase64 = base64;
+      
+      if (previewImg && previewContainer) {
+        previewImg.src = base64;
+        previewContainer.classList.remove('hidden');
+      }
+    } catch (err) {
+      console.error(err);
+      showToast('เกิดข้อผิดพลาดในการโหลดรูปภาพ: ' + err.message, 'error');
+      if (fileInput) fileInput.value = '';
+    }
+  });
+
+  btnRemoveImage?.addEventListener('click', () => {
+    clearSuggestImage();
+  });
   
   anonCheckbox?.addEventListener('change', () => {
     if (anonCheckbox.checked) {
@@ -576,6 +651,7 @@ function setupSuggestModalEvents() {
           signature: sig || null,
           is_anonymous: anonymous,
           suggested_by: currentUserId,
+          image_url: suggestImageBase64,
           status: 'pending'
         });
         
@@ -591,6 +667,7 @@ function setupSuggestModalEvents() {
       showToast('เสนอชื่อเทศกาลใหม่สำเร็จแล้ว! โปรดรอผู้ดูแลระบบพิจารณา 🎡', 'success');
       modal.classList.add('hidden');
       form.reset();
+      clearSuggestImage();
     } catch (error) {
       console.error('Error suggesting festival:', error);
       showToast('ไม่สามารถส่งข้อเสนอแนะได้: ' + error.message, 'error');
