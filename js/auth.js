@@ -23,6 +23,29 @@ export const getUserProfile = async (userId) => {
       const overrideRole = localStorage.getItem('myfestival_admin_role_override') || 'admin';
       const overrideName = localStorage.getItem('myfestival_admin_name_override') || user.user_metadata?.full_name || '6nathan.dev';
       const overrideAvatar = localStorage.getItem('myfestival_admin_avatar_override') || user.user_metadata?.avatar_url || `https://api.dicebear.com/7.x/fun-emoji/svg?seed=${user.email}`;
+      
+      // Ensure the profile row exists in the DB so foreign keys don't fail!
+      try {
+        const { data: existing, error: checkError } = await supabase
+          .from('profiles')
+          .select('id')
+          .eq('id', userId)
+          .maybeSingle();
+          
+        if (!existing || checkError) {
+          await supabase.from('profiles').insert({
+            id: user.id,
+            email: user.email,
+            full_name: overrideName,
+            avatar_url: overrideAvatar,
+            role: overrideRole
+          });
+          console.log('Admin profile auto-inserted into DB');
+        }
+      } catch (dbErr) {
+        console.error('Error ensuring admin profile in DB:', dbErr);
+      }
+
       return {
         id: user.id,
         email: user.email,
