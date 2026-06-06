@@ -285,6 +285,22 @@ create policy "Allow admins to delete/update suggestions"
         exists (select 1 from public.profiles where id = auth.uid() and role = 'admin')
     );
 
--- 16. ENABLE REAL-TIME FOR ALL APP TABLES
+-- 16. ABOUT INFO POLICIES
+alter table about_info enable row level security;
+
+drop policy if exists "Allow public read of about_info" on about_info;
+create policy "Allow public read of about_info"
+    on about_info for select
+    using (true);
+
+drop policy if exists "Allow admin full control on about_info" on about_info;
+create policy "Allow admin full control on about_info"
+    on about_info for all
+    using (
+        auth.jwt() ->> 'email' = '6nathan.dev@gmail.com' or 
+        exists (select 1 from public.profiles where id = auth.uid() and role = 'admin')
+    );
+
+-- 17. ENABLE REAL-TIME FOR ALL APP TABLES
 drop publication if exists supabase_realtime;
-create publication supabase_realtime for table profiles, messages, message_revisions, reports, festivals, notifications, festival_suggestions;
+create publication supabase_realtime for table profiles, messages, message_revisions, reports, festivals, notifications, festival_suggestions, about_info;
