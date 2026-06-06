@@ -349,7 +349,7 @@ function setupInteractiveEvents() {
   document.getElementById('btn-copy-link')?.addEventListener('click', async () => {
     if (!currentMessage) return;
     
-    const shareUrl = `${window.location.origin}/message/${currentMessage.id}`;
+    const shareUrl = `${window.location.origin}/#/message/${currentMessage.id}`;
     
     try {
       await navigator.clipboard.writeText(shareUrl);
