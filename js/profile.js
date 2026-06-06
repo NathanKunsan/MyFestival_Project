@@ -18,6 +18,8 @@ export const init = async () => {
   await loadProfileData(user);
   setupAvatarPreview();
   setupFormSubmit();
+  await loadNotifications();
+  setupNotificationEvents();
 };
 
 // Fetch and load profile data into form elements
@@ -232,4 +234,108 @@ function getRoleThai(role) {
     case 'contributor': return '✍️ ผู้เขียนคำอวยพร (Contributor)';
     default: return '👤 สมาชิกทั่วไป (Member)';
   }
+}
+
+async function loadNotifications() {
+  const listContainer = document.getElementById('profile-notifications-list');
+  if (!listContainer) return;
+  
+  const supabase = await getSupabase();
+  if (!supabase) return;
+  
+  try {
+    const { data: notifications, error } = await supabase
+      .from('notifications')
+      .select('*')
+      .eq('user_id', currentUserId)
+      .order('created_at', { ascending: false })
+      .limit(30);
+      
+    if (error) throw error;
+    
+    // Auto mark all retrieved notifications as read to reset badge
+    const unreadIds = (notifications || []).filter(n => !n.is_read).map(n => n.id);
+    if (unreadIds.length > 0) {
+      await supabase
+        .from('notifications')
+        .update({ is_read: true })
+        .in('id', unreadIds);
+        
+      // Update badge count in navbar
+      await refreshAuthUI();
+    }
+    
+    if (!notifications || notifications.length === 0) {
+      listContainer.innerHTML = `
+        <p class="text-pencil-light font-bold italic text-center py-6">ไม่มีการแจ้งเตือนในขณะนี้... 🕊️</p>
+      `;
+      return;
+    }
+    
+    listContainer.innerHTML = notifications.map(notif => {
+      const dateStr = new Date(notif.created_at).toLocaleString('th-TH');
+      
+      let typeBadge = '';
+      if (notif.type === 'approval') {
+        typeBadge = '<span class="sketch-badge btn-green text-[9px] font-black uppercase">อนุมัติ</span>';
+      } else if (notif.type === 'rejection') {
+        typeBadge = '<span class="sketch-badge btn-red text-[9px] font-black uppercase">ปฏิเสธ</span>';
+      } else {
+        typeBadge = '<span class="sketch-badge btn-cream text-[9px] font-black uppercase">ระบบ</span>';
+      }
+      
+      const readClass = notif.is_read ? 'opacity-75' : 'bg-wood-yellow/10 border-l-4 border-l-wood-yellow pl-3';
+      
+      return `
+        <div class="sketch-card p-3 bg-white text-xs ${readClass} shadow-[1.5px_1.5px_0px_0px_#4a3c31] space-y-1">
+          <div class="flex justify-between items-center gap-2 flex-wrap">
+            <div class="flex items-center gap-1.5">
+              ${typeBadge}
+              <span class="font-extrabold text-pencil">${notif.title}</span>
+            </div>
+            <span class="text-[10px] text-pencil-light font-bold">${dateStr}</span>
+          </div>
+          <p class="font-bold text-pencil-light leading-relaxed">
+            ${notif.content}
+          </p>
+        </div>
+      `;
+    }).join('');
+    
+  } catch (err) {
+    console.error('Error loading notifications:', err);
+    listContainer.innerHTML = `<p class="text-wood-red font-bold text-center py-6 text-sm">ไม่สามารถโหลดการแจ้งเตือนได้: ${err.message}</p>`;
+  }
+}
+
+function setupNotificationEvents() {
+  const btnClear = document.getElementById('btn-clear-notifications');
+  btnClear?.addEventListener('click', async () => {
+    const supabase = await getSupabase();
+    if (!supabase) return;
+    
+    const btnText = btnClear.textContent;
+    btnClear.disabled = true;
+    btnClear.textContent = 'กำลังล้าง... ⏳';
+    
+    try {
+      const { error } = await supabase
+        .from('notifications')
+        .update({ is_read: true })
+        .eq('user_id', currentUserId)
+        .eq('is_read', false);
+        
+      if (error) throw error;
+      
+      showToast('ล้างการแจ้งเตือนทั้งหมดเป็นอ่านแล้วสำเร็จ!', 'success');
+      await refreshAuthUI();
+      await loadNotifications();
+    } catch (err) {
+      console.error('Error clearing notifications:', err);
+      showToast('ไม่สามารถล้างการแจ้งเตือนได้: ' + err.message, 'error');
+    } finally {
+      btnClear.disabled = false;
+      btnClear.textContent = btnText;
+    }
+  });
 }
