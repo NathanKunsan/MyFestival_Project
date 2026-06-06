@@ -1977,6 +1977,10 @@ function renderSuggestionsQueue(suggestions) {
         <div class="space-y-2">
           <p class="text-lg font-extrabold text-wood-orange">🎪 ชื่อที่เสนอ: ${sug.name}</p>
           <p class="text-sm font-bold text-pencil-light">📝 คำอธิบาย: ${sug.description}</p>
+          ${sug.image_url ? `
+          <div class="my-2 border-2 border-pencil rounded-lg overflow-hidden max-w-xs bg-pencil-soft/10">
+            <img src="${sug.image_url}" class="w-full h-auto object-cover max-h-40" alt="ภาพประกอบข้อเสนอ">
+          </div>` : ''}
           <div class="bg-wood-yellow/10 border-2 border-pencil p-3 rounded-lg">
             <p class="text-xs text-pencil-light font-black uppercase mb-1">คำอวยพรร่วมสร้างชิ้นแรก:</p>
             <p class="text-sm font-bold italic text-pencil">"${sug.suggested_wish}"</p>
@@ -2193,7 +2197,7 @@ async function handleApproveSuggestion(sug) {
         .insert({
           name: sug.name,
           description: sug.description,
-          image_url: 'https://images.unsplash.com/photo-1513151233558-d860c5398176?w=800',
+          image_url: sug.image_url || 'https://images.unsplash.com/photo-1513151233558-d860c5398176?w=800',
           start_date: startDate.toISOString(),
           end_date: endDate.toISOString()
         })
