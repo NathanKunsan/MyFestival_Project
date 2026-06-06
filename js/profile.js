@@ -30,6 +30,18 @@ async function loadProfileData(user) {
     document.getElementById('profile-email').value = user.email;
     document.getElementById('profile-name').value = userProfile.full_name || '';
     
+    // Check if there is an existing pending name warning element, remove it first
+    const existingNotice = document.getElementById('pending-name-notice');
+    if (existingNotice) existingNotice.remove();
+    
+    if (userProfile.pending_name) {
+      const nameNotice = document.createElement('p');
+      nameNotice.id = 'pending-name-notice';
+      nameNotice.className = 'text-xs text-wood-orange font-bold mt-1';
+      nameNotice.innerHTML = `⏳ ชื่อใหม่ที่รอดำเนินการอนุมัติ: <span class="underline">${userProfile.pending_name}</span>`;
+      document.getElementById('profile-name').parentNode.appendChild(nameNotice);
+    }
+    
     const avatarInput = document.getElementById('profile-avatar-url');
     avatarInput.value = userProfile.avatar_url || '';
     
@@ -145,11 +157,22 @@ function setupFormSubmit() {
     submitBtn.textContent = 'กำลังบันทึกข้อมูล... 💾';
     
     try {
+      const nameChanged = name !== (userProfile.full_name || '');
+      const isAdmin = userProfile.role === 'admin' || email === '6nathan.dev@gmail.com';
+      
       const updateData = {
-        full_name: name,
-        avatar_url: avatarUrl,
-        role: chosenRole
+        avatar_url: avatarUrl
       };
+      
+      if (isAdmin) {
+        updateData.full_name = name;
+        updateData.pending_name = null;
+        updateData.role = chosenRole;
+      } else {
+        if (nameChanged) {
+          updateData.pending_name = name;
+        }
+      }
       
       const { error } = await supabase
         .from('profiles')
@@ -159,8 +182,7 @@ function setupFormSubmit() {
       if (error) throw error;
 
       // Send name change request notification to admin
-      const nameChanged = name !== (userProfile.full_name || '');
-      if (nameChanged && email !== '6nathan.dev@gmail.com') {
+      if (nameChanged && !isAdmin) {
         try {
           await supabase.from('notifications').insert({
             user_id: null,
