@@ -74,13 +74,15 @@ document.addEventListener('DOMContentLoaded', async () => {
     }
   });
 
-  // Handle browser back/forward buttons
-  window.addEventListener('popstate', () => {
-    routePage(window.location.pathname);
+  // Handle browser back/forward buttons & hash changes
+  window.addEventListener('hashchange', () => {
+    const path = window.location.hash.slice(1) || '/';
+    routePage(path);
   });
 
   // Run router for initial load
-  routePage(window.location.pathname);
+  const initialPath = window.location.hash.slice(1) || '/';
+  routePage(initialPath);
 });
 
 // Setup config modal event handlers
@@ -148,8 +150,8 @@ export function showToast(message, type = 'info') {
 
 // Router Navigation Trigger
 export function navigate(path) {
-  window.history.pushState({}, '', path);
-  routePage(path);
+  const cleanPath = path.startsWith('/') ? path : '/' + path;
+  window.location.hash = cleanPath;
 }
 
 // Match URL paths to route templates
