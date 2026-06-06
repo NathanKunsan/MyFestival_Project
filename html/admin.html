@@ -35,6 +35,9 @@
         <button id="tab-festivals" class="admin-tab sketch-btn btn-cream py-1 px-2.5 sm:py-1.5 sm:px-4 text-xs sm:text-sm md:text-base font-bold">
           🎡 จัดการเทศกาล
         </button>
+        <button id="tab-wishes" class="admin-tab sketch-btn btn-cream py-1 px-2.5 sm:py-1.5 sm:px-4 text-xs sm:text-sm md:text-base font-bold">
+          💌 จัดการคำอวยพร
+        </button>
         <button id="tab-members" class="admin-tab sketch-btn btn-cream py-1 px-2.5 sm:py-1.5 sm:px-4 text-xs sm:text-sm md:text-base font-bold">
           👥 จัดการสมาชิก
         </button>
@@ -62,6 +65,22 @@
             <h2 class="text-xl font-extrabold mb-4 pb-2 border-b-2 border-pencil">🔄 รายการขอปรับปรุงแก้ไข (Pending Revisions)</h2>
             <div id="queue-revisions" class="space-y-4">
               <p class="text-pencil-light font-bold italic text-center py-6">ไม่มีคำขอปรับปรุงแก้ไขข้อความในคิว...</p>
+            </div>
+          </div>
+
+          <!-- Part C: Festival Suggestions Queue -->
+          <div class="sketch-card p-6 bg-white shadow-[4px_4px_0px_0px_#4a3c31]">
+            <h2 class="text-xl font-extrabold mb-4 pb-2 border-b-2 border-pencil">🎡 ข้อเสนอแนะเทศกาลใหม่ (Festival Suggestions)</h2>
+            <div id="queue-suggestions" class="space-y-4">
+              <p class="text-pencil-light font-bold italic text-center py-6">ไม่มีข้อเสนอแนะนำเทศกาลใหม่ในคิว...</p>
+            </div>
+          </div>
+
+          <!-- Part D: คำร้องขอเปลี่ยนชื่อสมาชิก (Name Change Requests) -->
+          <div class="sketch-card p-6 bg-white shadow-[4px_4px_0px_0px_#4a3c31]">
+            <h2 class="text-xl font-extrabold mb-4 pb-2 border-b-2 border-pencil">📝 คำร้องขอเปลี่ยนชื่อสมาชิก (Name Change Requests)</h2>
+            <div id="queue-name-changes" class="space-y-4">
+              <p class="text-pencil-light font-bold italic text-center py-6">ไม่มีคำร้องขอเปลี่ยนชื่อสมาชิกในคิว... 🕊️</p>
             </div>
           </div>
         </div>
@@ -95,8 +114,11 @@
                 </div>
                 
                 <div class="flex flex-col gap-1">
-                  <label for="fest-image" class="font-bold text-sm">ลิงก์รูปภาพปก (Unsplash Image URL):</label>
-                  <input type="url" id="fest-image" placeholder="https://images.unsplash.com/..." class="sketch-input w-full">
+                  <label for="fest-image" class="font-bold text-sm">อัปโหลดรูปภาพปก:</label>
+                  <input type="file" id="fest-image" accept="image/*" class="sketch-input w-full">
+                  <div id="fest-image-preview-container" class="hidden mt-2 border-2 border-pencil rounded p-1 max-w-[200px]">
+                    <img id="fest-image-preview" class="w-full aspect-[800/533] object-cover" src="" alt="Cover Preview">
+                  </div>
                 </div>
                 
                 <div class="flex flex-col gap-1">
@@ -132,6 +154,21 @@
               <div id="admin-festivals-list" class="space-y-4">
                 <!-- Populated by JS -->
               </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Tab: Wishes Management -->
+        <div id="panel-wishes" class="admin-panel hidden space-y-6">
+          <div class="sketch-card p-6 bg-white shadow-[4px_4px_0px_0px_#4a3c31]">
+            <div class="flex justify-between items-center mb-6 pb-2 border-b-2 border-pencil flex-wrap gap-4">
+              <h2 class="text-xl font-extrabold flex items-center gap-2">💌 จัดการคำอวยพรทั้งหมด (Wishes Management)</h2>
+              <div class="flex items-center gap-2">
+                <input type="text" id="wishes-search-input" placeholder="🔍 ค้นหาด้วยข้อความ/ผู้เขียน..." class="sketch-input text-xs py-1 px-3 w-48 sm:w-64">
+              </div>
+            </div>
+            <div id="wishes-list-container" class="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <!-- Rendered dynamically by JS -->
             </div>
           </div>
         </div>
@@ -220,16 +257,16 @@
       <!-- Rejection Reason Dialog Modal -->
       <div id="rejection-modal" class="hidden fixed inset-0 z-50 flex items-center justify-center bg-black/60 px-4">
         <div class="sketch-card p-6 max-w-md w-full bg-white">
-          <h3 class="text-xl font-extrabold mb-2 text-wood-red">❌ ปฏิเสธการอนุมัติ</h3>
-          <p class="text-pencil-light text-xs mb-4">โปรดระบุเหตุผลในการปฏิเสธการพิจารณาคำอวยพรนี้ เพื่อส่งข้อมูลกลับไปยังผู้เขียนคำอวยพร</p>
+          <h3 class="text-xl font-extrabold mb-2 text-wood-red">❌ ปฏิเสธการอนุมัติ / การเสนอแนะ</h3>
+          <p class="text-pencil-light text-xs mb-4">โปรดระบุเหตุผลในการปฏิเสธครั้งนี้ เพื่อแจ้งกลับไปยังผู้เกี่ยวข้อง</p>
           
           <form id="rejection-form" class="space-y-4">
             <input type="hidden" id="rejection-target-id">
-            <input type="hidden" id="rejection-target-type"> <!-- 'new' or 'revision' -->
+            <input type="hidden" id="rejection-target-type"> <!-- 'new', 'revision', or 'suggestion' -->
             
             <div class="flex flex-col gap-1">
               <label for="rejection-reason-input" class="font-bold text-sm">ระบุเหตุผล:</label>
-              <textarea id="rejection-reason-input" required rows="3" placeholder="เช่น ใช้คำพูดไม่สุภาพ, ผิดกลุ่มประเพณี..." class="sketch-input w-full resize-none"></textarea>
+              <textarea id="rejection-reason-input" required rows="3" placeholder="ระบุเหตุผล..." class="sketch-input w-full resize-none"></textarea>
             </div>
             
             <div class="sketch-divider"></div>
@@ -237,6 +274,54 @@
             <div class="flex justify-end gap-3">
               <button type="button" id="btn-close-rejection" class="sketch-btn btn-cream px-4 py-2">ยกเลิก</button>
               <button type="submit" class="sketch-btn btn-red px-5 py-2">ปฏิเสธคำขอ</button>
+            </div>
+          </form>
+        </div>
+      </div>
+
+      <!-- Request Edit Dialog Modal -->
+      <div id="request-edit-modal" class="hidden fixed inset-0 z-50 flex items-center justify-center bg-black/60 px-4">
+        <div class="sketch-card p-6 max-w-md w-full bg-white">
+          <h3 class="text-xl font-extrabold mb-2 text-wood-orange">📝 ส่งข้อความขอให้แก้ไขคำอวยพร</h3>
+          <p class="text-pencil-light text-xs mb-4">โปรดระบุคำแนะนำหรือรายละเอียดเพื่อให้ผู้เขียนคำอวยพรนี้นำไปปรับปรุงแก้ไขการ์ดของตนเอง</p>
+          
+          <form id="request-edit-form" class="space-y-4">
+            <input type="hidden" id="request-edit-target-id">
+            
+            <div class="flex flex-col gap-1">
+              <label for="request-edit-reason-input" class="font-bold text-sm">คำแนะนำการแก้ไข:</label>
+              <textarea id="request-edit-reason-input" required rows="3" placeholder="เช่น กรุณาตรวจสอบการสะกดคำ, ปรับภาษาให้เหมาะสมกับเทศกาล..." class="sketch-input w-full resize-none"></textarea>
+            </div>
+            
+            <div class="sketch-divider"></div>
+            
+            <div class="flex justify-end gap-3">
+              <button type="button" id="btn-close-request-edit" class="sketch-btn btn-cream px-4 py-2">ยกเลิก</button>
+              <button type="submit" class="sketch-btn btn-orange px-5 py-2">ส่งคำขอแก้ไข</button>
+            </div>
+          </form>
+        </div>
+      </div>
+
+      <!-- Delete Reason Dialog Modal -->
+      <div id="delete-reason-modal" class="hidden fixed inset-0 z-50 flex items-center justify-center bg-black/60 px-4">
+        <div class="sketch-card p-6 max-w-md w-full bg-white">
+          <h3 class="text-xl font-extrabold mb-2 text-wood-red">🗑️ ลบคำอวยพรพร้อมเหตุผล</h3>
+          <p class="text-pencil-light text-xs mb-4">โปรดระบุเหตุผลในการลบคำอวยพรนี้ เพื่อแจ้งไปยังผู้เขียนผ่านระบบการแจ้งเตือน</p>
+          
+          <form id="delete-reason-form" class="space-y-4">
+            <input type="hidden" id="delete-reason-target-id">
+            
+            <div class="flex flex-col gap-1">
+              <label for="delete-reason-input" class="font-bold text-sm">เหตุผลที่ลบ:</label>
+              <textarea id="delete-reason-input" required rows="3" placeholder="เช่น ผิดเงื่อนไขการใช้งาน, มีเนื้อหาที่ไม่เหมาะสม..." class="sketch-input w-full resize-none"></textarea>
+            </div>
+            
+            <div class="sketch-divider"></div>
+            
+            <div class="flex justify-end gap-3">
+              <button type="button" id="btn-close-delete-reason" class="sketch-btn btn-cream px-4 py-2">ยกเลิก</button>
+              <button type="submit" class="sketch-btn btn-red px-5 py-2">ยืนยันการลบ 🗑️</button>
             </div>
           </form>
         </div>
