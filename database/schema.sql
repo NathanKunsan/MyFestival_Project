@@ -145,6 +145,7 @@ create table festival_suggestions (
     signature text,
     is_anonymous boolean default false not null,
     suggested_by uuid references profiles(id) on delete cascade,
+    image_url text,
     status text not null default 'pending' check (status in ('pending', 'approved', 'rejected')),
     created_at timestamp with time zone default now() not null,
     updated_at timestamp with time zone default now() not null
