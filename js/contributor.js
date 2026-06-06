@@ -7,6 +7,8 @@ let currentUserId = null;
 let userMessages = [];
 let editMessageObj = null;
 let userProfile = null;
+let festivalsList = [];
+
 
 // Initialize Page
 export const init = async () => {
@@ -23,6 +25,7 @@ export const init = async () => {
   await loadDashboardData();
   setupAddMessageForm();
   setupEditModalEvents();
+  setupSuggestModalEvents();
 };
 
 // Fetch festivals for dropdown select option
@@ -39,9 +42,18 @@ async function fetchFestivalsList() {
       
     if (error) throw error;
     
-    select.innerHTML = (data || []).map(f => `
+    festivalsList = data || [];
+    
+    select.innerHTML = festivalsList.map(f => `
       <option value="${f.id}">${f.name}</option>
     `).join('');
+    
+    const editSelect = document.getElementById('edit-festival-select');
+    if (editSelect) {
+      editSelect.innerHTML = festivalsList.map(f => `
+        <option value="${f.id}">${f.name}</option>
+      `).join('');
+    }
   } catch (error) {
     console.error('Error fetching festivals list:', error);
   }
@@ -217,6 +229,7 @@ function setupAddMessageForm() {
     submitBtn.textContent = 'กำลังส่งข้อมูล... ⏳';
     
     try {
+      const isApproved = userProfile?.role === 'admin';
       const { error } = await supabase
         .from('messages')
         .insert({
@@ -225,7 +238,7 @@ function setupAddMessageForm() {
           message_text: text,
           signature: sig || null,
           is_anonymous: anonymous,
-          status: 'pending' // Defaults to pending
+          status: isApproved ? 'approved' : 'pending'
         });
         
       if (error) throw error;
@@ -237,8 +250,17 @@ function setupAddMessageForm() {
         details: { festival_id: festivalId }
       });
       
-      showToast('ฝากคำอวยพรสำเร็จแล้ว! โปรดรอผู้ดูแลระบบตรวจสอบและอนุมัติ', 'success');
+      const successMsg = isApproved 
+        ? 'ฝากคำอวยพรสำเร็จและอนุมัติเข้าระบบทันที! 🎉' 
+        : 'ฝากคำอวยพรสำเร็จแล้ว! โปรดรอผู้ดูแลระบบตรวจสอบและอนุมัติ';
+      showToast(successMsg, 'success');
       form.reset();
+      
+      if (sigInput && userProfile) {
+        sigInput.value = userProfile.full_name || 'ผู้เขียน';
+        sigInput.classList.remove('text-gray-400');
+        sigInput.classList.add('text-pencil');
+      }
       
       // Reload Dashboard
       await loadDashboardData();
@@ -258,7 +280,12 @@ function openEditModal(message) {
   
   document.getElementById('edit-msg-id').value = message.id;
   document.getElementById('edit-msg-status').value = message.status;
-  document.getElementById('edit-festival-name').value = message.festivals?.name || '';
+  
+  const editSelect = document.getElementById('edit-festival-select');
+  if (editSelect) {
+    editSelect.value = message.festival_id || message.festivals?.id || '';
+  }
+  
   document.getElementById('edit-text-input').value = message.message_text;
   
   const editSigInput = document.getElementById('edit-sig-input');
@@ -311,6 +338,42 @@ function setupEditModalEvents() {
     editMessageObj = null;
   });
   
+  document.getElementById('btn-delete-edit')?.addEventListener('click', async () => {
+    if (!editMessageObj) return;
+    
+    if (!confirm('คุณแน่ใจหรือไม่ว่าต้องการลบคำอวยพรนี้ออกจากระบบ?')) {
+      return;
+    }
+    
+    const supabase = await getSupabase();
+    if (!supabase) return;
+    
+    const deleteBtn = document.getElementById('btn-delete-edit');
+    const origText = deleteBtn.textContent;
+    deleteBtn.disabled = true;
+    deleteBtn.textContent = '🗑️ กำลังลบ...';
+    
+    try {
+      const { error } = await supabase
+        .from('messages')
+        .delete()
+        .eq('id', editMessageObj.id);
+        
+      if (error) throw error;
+      
+      showToast('ลบคำอวยพรสำเร็จแล้ว!', 'success');
+      document.getElementById('edit-message-modal').classList.add('hidden');
+      editMessageObj = null;
+      await loadDashboardData();
+    } catch (error) {
+      console.error('Error deleting message:', error);
+      showToast('ไม่สามารถลบคำอวยพรได้: ' + error.message, 'error');
+    } finally {
+      deleteBtn.disabled = false;
+      deleteBtn.textContent = origText;
+    }
+  });
+  
   const editForm = document.getElementById('edit-message-form');
   editForm?.addEventListener('submit', async (e) => {
     e.preventDefault();
@@ -319,6 +382,7 @@ function setupEditModalEvents() {
     const supabase = await getSupabase();
     if (!supabase) return;
     
+    const festivalId = document.getElementById('edit-festival-select').value;
     const text = document.getElementById('edit-text-input').value.trim();
     const sig = document.getElementById('edit-sig-input').value.trim();
     const anonymous = document.getElementById('edit-anonymous-checkbox').checked;
@@ -329,12 +393,15 @@ function setupEditModalEvents() {
     submitBtn.textContent = 'กำลังบันทึก...';
     
     try {
-      if (editMessageObj.status === 'approved') {
+      const isApproved = userProfile?.role === 'admin';
+      
+      if (editMessageObj.status === 'approved' && !isApproved) {
         // Edit Approved Message -> Create a new revision entry in message_revisions
         const { error } = await supabase
           .from('message_revisions')
           .insert({
             message_id: editMessageObj.id,
+            festival_id: festivalId,
             message_text: text,
             signature: sig || null,
             is_anonymous: anonymous,
@@ -351,14 +418,15 @@ function setupEditModalEvents() {
         
         showToast('ส่งข้อความแก้ไขเข้ารอการตรวจสอบใหม่สำเร็จแล้ว! ข้อความออริจินัลยังคงแสดงผลอยู่ตามปกติ', 'success');
       } else {
-        // Edit Pending / Rejected Message -> Update messages table directly and set status to pending
+        // Edit Pending / Rejected Message OR Admin editing -> Update messages table directly
         const { error } = await supabase
           .from('messages')
           .update({
+            festival_id: festivalId,
             message_text: text,
             signature: sig || null,
             is_anonymous: anonymous,
-            status: 'pending',
+            status: isApproved ? 'approved' : 'pending',
             rejection_reason: null // Clear previous rejection reason
           })
           .eq('id', editMessageObj.id);
@@ -367,11 +435,14 @@ function setupEditModalEvents() {
         
         await supabase.from('activity_logs').insert({
           user_id: currentUserId,
-          action: 'update_message_directly',
+          action: isApproved ? 'admin_edit_message_directly' : 'update_message_directly',
           details: { message_id: editMessageObj.id }
         });
         
-        showToast('อัปเดตคำอวยพรเรียบร้อยและส่งตรวจสอบซ้ำสำเร็จแล้ว!', 'success');
+        const successMsg = isApproved 
+          ? 'อัปเดตคำอวยพรเรียบร้อยและมีผลทันที! 🎉' 
+          : 'อัปเดตคำอวยพรเรียบร้อยและส่งตรวจสอบซ้ำสำเร็จแล้ว!';
+        showToast(successMsg, 'success');
       }
       
       document.getElementById('edit-message-modal').classList.add('hidden');
@@ -380,6 +451,101 @@ function setupEditModalEvents() {
     } catch (error) {
       console.error('Error saving edited message:', error);
       showToast('ไม่สามารถบันทึกข้อความได้: ' + error.message, 'error');
+    } finally {
+      submitBtn.disabled = false;
+      submitBtn.textContent = origText;
+    }
+  });
+}
+
+// Setup suggest festival modal events
+function setupSuggestModalEvents() {
+  const modal = document.getElementById('suggest-festival-modal');
+  const btnOpen = document.getElementById('btn-suggest-festival');
+  const btnClose = document.getElementById('btn-close-suggest');
+  const form = document.getElementById('suggest-festival-form');
+  const sigInput = document.getElementById('suggest-sig-input');
+  const anonCheckbox = document.getElementById('suggest-anonymous-checkbox');
+  
+  if (btnOpen && modal) {
+    btnOpen.addEventListener('click', () => {
+      // Pre-fill signature
+      if (sigInput && userProfile) {
+        sigInput.readOnly = true;
+        sigInput.classList.add('bg-pencil-soft/20', 'cursor-not-allowed');
+        if (anonCheckbox && anonCheckbox.checked) {
+          sigInput.value = 'ผู้ไม่ประสงค์ออกนาม';
+        } else {
+          sigInput.value = userProfile.full_name || 'ผู้เขียน';
+        }
+      }
+      modal.classList.remove('hidden');
+    });
+  }
+  
+  if (btnClose && modal) {
+    btnClose.addEventListener('click', () => {
+      modal.classList.add('hidden');
+      form?.reset();
+    });
+  }
+  
+  anonCheckbox?.addEventListener('change', () => {
+    if (anonCheckbox.checked) {
+      sigInput.value = 'ผู้ไม่ประสงค์ออกนาม';
+      sigInput.classList.add('text-gray-400');
+      sigInput.classList.remove('text-pencil');
+    } else {
+      sigInput.value = userProfile?.full_name || 'ผู้เขียน';
+      sigInput.classList.remove('text-gray-400');
+      sigInput.classList.add('text-pencil');
+    }
+  });
+  
+  form?.addEventListener('submit', async (e) => {
+    e.preventDefault();
+    const supabase = await getSupabase();
+    if (!supabase) return;
+    
+    const name = document.getElementById('suggest-name-input').value.trim();
+    const desc = document.getElementById('suggest-desc-input').value.trim();
+    const wish = document.getElementById('suggest-wish-input').value.trim();
+    const sig = sigInput.value.trim();
+    const anonymous = anonCheckbox.checked;
+    
+    const submitBtn = form.querySelector('button[type="submit"]');
+    const origText = submitBtn.textContent;
+    submitBtn.disabled = true;
+    submitBtn.textContent = 'กำลังส่งข้อมูล... ⏳';
+    
+    try {
+      const { error } = await supabase
+        .from('festival_suggestions')
+        .insert({
+          name: name,
+          description: desc,
+          suggested_wish: wish,
+          signature: sig || null,
+          is_anonymous: anonymous,
+          suggested_by: currentUserId,
+          status: 'pending'
+        });
+        
+      if (error) throw error;
+      
+      // Log activity
+      await supabase.from('activity_logs').insert({
+        user_id: currentUserId,
+        action: 'suggest_festival',
+        details: { name: name }
+      });
+      
+      showToast('เสนอชื่อเทศกาลใหม่สำเร็จแล้ว! โปรดรอผู้ดูแลระบบพิจารณา 🎡', 'success');
+      modal.classList.add('hidden');
+      form.reset();
+    } catch (error) {
+      console.error('Error suggesting festival:', error);
+      showToast('ไม่สามารถส่งข้อเสนอแนะได้: ' + error.message, 'error');
     } finally {
       submitBtn.disabled = false;
       submitBtn.textContent = origText;
