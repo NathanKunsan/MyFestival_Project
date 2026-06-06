@@ -4,6 +4,9 @@ import { navigate, showToast } from './router.js';
 
 let festivalsData = [];
 let currentSliderIndex = 0;
+let messagesSubscription = null;
+let festivalsSubscription = null;
+let isInitialLoad = true;
 
 // Initialize Festival Page
 export const init = async () => {
@@ -12,6 +15,7 @@ export const init = async () => {
   
   await fetchAndRenderFestivals(supabase);
   setupSliderEvents();
+  setupRealtime(supabase);
 };
 
 // Helper for mock festivals data fallback
@@ -193,12 +197,17 @@ function renderHeroSlider() {
   const heroSlider = document.getElementById('hero-slider');
   if (!heroSlider || festivalsData.length === 0) return;
   
-  // Find current active festival, or default to first
-  const now = new Date();
-  const activeIndex = festivalsData.findIndex(f => new Date(f.start_date) <= now && new Date(f.end_date) >= now);
-  
-  if (activeIndex !== -1) {
-    currentSliderIndex = activeIndex;
+  if (isInitialLoad) {
+    // Find current active festival, or default to first
+    const now = new Date();
+    const activeIndex = festivalsData.findIndex(f => new Date(f.start_date) <= now && new Date(f.end_date) >= now);
+    
+    if (activeIndex !== -1) {
+      currentSliderIndex = activeIndex;
+    }
+    isInitialLoad = false;
+  } else if (currentSliderIndex >= festivalsData.length) {
+    currentSliderIndex = 0;
   }
   
   updateSliderContent();
@@ -304,3 +313,45 @@ function hashCode(str) {
   }
   return hash;
 }
+
+function setupRealtime(supabase) {
+  // Subscribe to messages changes to update counts in real-time
+  if (messagesSubscription) messagesSubscription.unsubscribe();
+  messagesSubscription = supabase
+    .channel('festival-messages-changes')
+    .on(
+      'postgres_changes',
+      { event: '*', schema: 'public', table: 'messages' },
+      async (payload) => {
+        console.log('Messages change detected in homepage:', payload);
+        await fetchAndRenderFestivals(supabase);
+      }
+    )
+    .subscribe();
+
+  // Subscribe to festivals changes
+  if (festivalsSubscription) festivalsSubscription.unsubscribe();
+  festivalsSubscription = supabase
+    .channel('festival-festivals-changes')
+    .on(
+      'postgres_changes',
+      { event: '*', schema: 'public', table: 'festivals' },
+      async (payload) => {
+        console.log('Festivals change detected in homepage:', payload);
+        await fetchAndRenderFestivals(supabase);
+      }
+    )
+    .subscribe();
+}
+
+export const cleanup = () => {
+  if (messagesSubscription) {
+    messagesSubscription.unsubscribe();
+    messagesSubscription = null;
+  }
+  if (festivalsSubscription) {
+    festivalsSubscription.unsubscribe();
+    festivalsSubscription = null;
+  }
+  isInitialLoad = true;
+};
