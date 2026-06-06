@@ -845,6 +845,7 @@ async function loadFestivalsTab() {
     const festivals = getMockData('festivals', initialMockFestivals);
     renderAdminFestivalsList(festivals);
   }
+  setupFestivalListEvents();
 }
 
 function renderAdminFestivalsList(festivals) {
@@ -868,49 +869,245 @@ function renderAdminFestivalsList(festivals) {
           <p class="text-xs text-pencil-light font-bold">🗓️ ${startStr} ถึง ${endStr}</p>
           <p class="text-xs text-pencil-light mt-1">${f.description || ''}</p>
         </div>
-        <div class="text-right">
+        <div class="flex flex-col items-end gap-2 shrink-0">
           <span class="sketch-badge btn-yellow text-xs font-black">💌 ${count} ข้อความ</span>
+          <button class="sketch-btn btn-cream text-xs py-1 px-2.5 btn-edit-festival font-bold" data-id="${f.id}">
+            แก้ไข ✏️
+          </button>
         </div>
       </div>
     `;
   }).join('');
 }
 
+function setupFestivalListEvents() {
+  const editButtons = document.querySelectorAll('.btn-edit-festival');
+  editButtons.forEach(btn => {
+    btn.addEventListener('click', async () => {
+      const festivalId = btn.getAttribute('data-id');
+      await enterEditFestivalMode(festivalId);
+    });
+  });
+}
+
+async function enterEditFestivalMode(id) {
+  const supabase = await getSupabase();
+  let festival = null;
+  
+  if (supabase && !id.startsWith('mock')) {
+    try {
+      const { data, error } = await supabase
+        .from('festivals')
+        .select('*')
+        .eq('id', id)
+        .single();
+      if (!error) festival = data;
+    } catch (err) {
+      console.warn('Error fetching festival details:', err);
+    }
+  }
+  
+  if (!festival) {
+    const festivals = getMockData('festivals', initialMockFestivals);
+    festival = festivals.find(f => f.id === id);
+  }
+  
+  if (!festival) {
+    showToast('ไม่พบข้อมูลเทศกาล', 'error');
+    return;
+  }
+  
+  // Populate form fields
+  document.getElementById('fest-id').value = festival.id;
+  document.getElementById('fest-name').value = festival.name;
+  document.getElementById('fest-desc').value = festival.description || '';
+  document.getElementById('fest-image').value = festival.image_url || '';
+  
+  // Format dates for flatpickr input (YYYY-MM-DD HH:MM)
+  const formatDateTime = (isoStr) => {
+    if (!isoStr) return '';
+    const d = new Date(isoStr);
+    const y = d.getFullYear();
+    const m = String(d.getMonth() + 1).padStart(2, '0');
+    const day = String(d.getDate()).padStart(2, '0');
+    const h = String(d.getHours()).padStart(2, '0');
+    const min = String(d.getMinutes()).padStart(2, '0');
+    return `${y}-${m}-${day} ${h}:${min}`;
+  };
+  
+  document.getElementById('fest-start').value = formatDateTime(festival.start_date);
+  document.getElementById('fest-end').value = formatDateTime(festival.end_date);
+  
+  // Update UI to Edit Mode
+  document.getElementById('festival-form-title').textContent = `🎡 แก้ไขเทศกาล: ${festival.name}`;
+  document.getElementById('btn-submit-festival').textContent = 'บันทึกการแก้ไข 💾';
+  document.getElementById('btn-submit-festival').className = 'sketch-btn btn-yellow w-full py-2 text-base font-bold';
+  document.getElementById('edit-festival-actions').classList.remove('hidden');
+  
+  // Scroll to form (for mobile user convenience)
+  document.getElementById('festival-form-title').scrollIntoView({ behavior: 'smooth' });
+}
+
+function exitEditFestivalMode() {
+  const form = document.getElementById('add-festival-form');
+  if (form) form.reset();
+  
+  document.getElementById('fest-id').value = '';
+  document.getElementById('festival-form-title').textContent = '🎡 เพิ่มเทศกาลใหม่';
+  document.getElementById('btn-submit-festival').textContent = 'สร้างเทศกาลเข้าระบบ 💾';
+  document.getElementById('btn-submit-festival').className = 'sketch-btn btn-green w-full py-2 text-base font-bold';
+  document.getElementById('edit-festival-actions').classList.add('hidden');
+}
+
 function setupFestivalForm() {
   const form = document.getElementById('add-festival-form');
-  form?.addEventListener('submit', async (e) => {
+  if (!form) return;
+  
+  form.addEventListener('submit', async (e) => {
     e.preventDefault();
     const supabase = await getSupabase();
     
+    const id = document.getElementById('fest-id').value;
     const name = document.getElementById('fest-name').value.trim();
     const desc = document.getElementById('fest-desc').value.trim();
     const image = document.getElementById('fest-image').value.trim();
     const start = document.getElementById('fest-start').value;
     const end = document.getElementById('fest-end').value;
     
-    const submitBtn = form.querySelector('button[type="submit"]');
+    const submitBtn = document.getElementById('btn-submit-festival');
     const origText = submitBtn.textContent;
     submitBtn.disabled = true;
-    submitBtn.textContent = 'กำลังสร้างเทศกาล...';
+    submitBtn.textContent = id ? 'กำลังบันทึกการแก้ไข...' : 'กำลังสร้างเทศกาล...';
     
     let dbSuccess = false;
     let dbError = null;
     
-    if (supabase) {
+    if (id) {
+      // Edit Mode (Update)
+      if (supabase && !id.startsWith('mock')) {
+        try {
+          const { error } = await supabase
+            .from('festivals')
+            .update({
+              name,
+              description: desc,
+              image_url: image || null,
+              start_date: new Date(start).toISOString(),
+              end_date: new Date(end).toISOString()
+            })
+            .eq('id', id);
+            
+          if (!error) {
+            dbSuccess = true;
+            showToast(`แก้ไขเทศกาล "${name}" เรียบร้อยแล้ว!`, 'success');
+          } else {
+            dbError = error;
+          }
+        } catch (error) {
+          dbError = error;
+        }
+      }
+      
+      if (!dbSuccess) {
+        console.warn('DB update festival failed, using mock:', dbError?.message);
+        const festivals = getMockData('festivals', initialMockFestivals);
+        const index = festivals.findIndex(f => f.id === id);
+        if (index !== -1) {
+          festivals[index] = {
+            ...festivals[index],
+            name,
+            description: desc,
+            image_url: image || 'https://images.unsplash.com/photo-1513151233558-d860c5398176?w=600',
+            start_date: new Date(start).toISOString(),
+            end_date: new Date(end).toISOString()
+          };
+          saveMockData('festivals', festivals);
+          showToast(`แก้ไขเทศกาล "${name}" เรียบร้อยแล้ว! (Mock)`, 'success');
+        }
+      }
+      exitEditFestivalMode();
+    } else {
+      // Add Mode (Insert)
+      if (supabase) {
+        try {
+          const { error } = await supabase
+            .from('festivals')
+            .insert({
+              name,
+              description: desc,
+              image_url: image || null,
+              start_date: new Date(start).toISOString(),
+              end_date: new Date(end).toISOString()
+            });
+            
+          if (!error) {
+            dbSuccess = true;
+            showToast(`สร้างเทศกาลใหม่ "${name}" สำเร็จแล้ว!`, 'success');
+          } else {
+            dbError = error;
+          }
+        } catch (error) {
+          dbError = error;
+        }
+      }
+      
+      if (!dbSuccess) {
+        console.warn('DB insert festival failed, using mock:', dbError?.message);
+        const festivals = getMockData('festivals', initialMockFestivals);
+        const newFest = {
+          id: `mock-fest-${Date.now()}`,
+          name,
+          description: desc,
+          image_url: image || 'https://images.unsplash.com/photo-1513151233558-d860c5398176?w=600',
+          start_date: new Date(start).toISOString(),
+          end_date: new Date(end).toISOString(),
+          messages: []
+        };
+        festivals.unshift(newFest);
+        saveMockData('festivals', festivals);
+        showToast(`สร้างเทศกาลใหม่ "${name}" สำเร็จแล้ว! (Mock)`, 'success');
+      }
+      form.reset();
+    }
+    
+    submitBtn.disabled = false;
+    submitBtn.textContent = origText;
+    await loadFestivalsTab();
+  });
+  
+  // Set up Cancel button listener
+  const btnCancel = document.getElementById('btn-cancel-edit-festival');
+  btnCancel?.addEventListener('click', () => {
+    exitEditFestivalMode();
+  });
+  
+  // Set up Delete button listener
+  const btnDelete = document.getElementById('btn-delete-festival');
+  btnDelete?.addEventListener('click', async () => {
+    const id = document.getElementById('fest-id').value;
+    const name = document.getElementById('fest-name').value;
+    if (!id) return;
+    
+    const confirmed = confirm(`⚠️ คุณแน่ใจหรือไม่ว่าต้องการลบเทศกาล "${name}"?\nการลบจะลบข้อมูลคำอวยพรทั้งหมดที่อยู่ในเทศกาลนี้ด้วย และไม่สามารถกู้คืนได้!`);
+    if (!confirmed) return;
+    
+    const supabase = await getSupabase();
+    let dbSuccess = false;
+    let dbError = null;
+    
+    btnDelete.disabled = true;
+    btnDelete.textContent = 'กำลังลบ...';
+    
+    if (supabase && !id.startsWith('mock')) {
       try {
         const { error } = await supabase
           .from('festivals')
-          .insert({
-            name,
-            description: desc,
-            image_url: image || null,
-            start_date: new Date(start).toISOString(),
-            end_date: new Date(end).toISOString()
-          });
+          .delete()
+          .eq('id', id);
           
         if (!error) {
           dbSuccess = true;
-          showToast(`สร้างเทศกาลใหม่ "${name}" สำเร็จแล้ว!`, 'success');
+          showToast(`ลบเทศกาล "${name}" เรียบร้อยแล้ว`, 'success');
         } else {
           dbError = error;
         }
@@ -920,25 +1117,22 @@ function setupFestivalForm() {
     }
     
     if (!dbSuccess) {
-      console.warn('DB insert festival failed, using mock:', dbError?.message);
+      console.warn('DB delete festival failed, using mock:', dbError?.message);
       const festivals = getMockData('festivals', initialMockFestivals);
-      const newFest = {
-        id: `mock-fest-${Date.now()}`,
-        name,
-        description: desc,
-        image_url: image || 'https://images.unsplash.com/photo-1513151233558-d860c5398176?w=600',
-        start_date: new Date(start).toISOString(),
-        end_date: new Date(end).toISOString(),
-        messages: []
-      };
-      festivals.unshift(newFest);
-      saveMockData('festivals', festivals);
-      showToast(`สร้างเทศกาลใหม่ "${name}" สำเร็จแล้ว! (Mock)`, 'success');
+      const filtered = festivals.filter(f => f.id !== id);
+      saveMockData('festivals', filtered);
+      
+      // Also clean up mock wishes belonging to this festival
+      const wishes = getMockData('wishes', initialMockWishes);
+      const filteredWishes = wishes.filter(w => w.festival_id !== id);
+      saveMockData('wishes', filteredWishes);
+      
+      showToast(`ลบเทศกาล "${name}" เรียบร้อยแล้ว (Mock)`, 'success');
     }
     
-    form.reset();
-    submitBtn.disabled = false;
-    submitBtn.textContent = origText;
+    exitEditFestivalMode();
+    btnDelete.disabled = false;
+    btnDelete.textContent = 'ลบเทศกาลนี้ 🗑️';
     await loadFestivalsTab();
   });
 }
