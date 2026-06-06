@@ -91,7 +91,12 @@
         <!-- Right: Contributor Message List -->
         <div class="lg:col-span-2 space-y-6">
           <div class="sketch-card p-6 bg-white shadow-[4px_4px_0px_0px_#4a3c31] min-h-[450px]">
-            <h2 class="text-xl font-extrabold mb-4 pb-2 border-b-2 border-pencil">📂 รายการสมุดความฝันของฉัน</h2>
+            <div class="flex justify-between items-center mb-4 pb-2 border-b-2 border-pencil flex-wrap gap-2">
+              <h2 class="text-xl font-extrabold">📂 รายการสมุดความฝันของฉัน</h2>
+              <button id="btn-suggest-festival" class="sketch-btn btn-yellow text-xs py-1 px-3">
+                🎡 เสนอชื่อเทศกาลใหม่
+              </button>
+            </div>
             
             <div id="contributor-msg-list" class="space-y-4">
               <!-- Populated by JS -->
@@ -117,8 +122,10 @@
             <input type="hidden" id="edit-msg-status">
             
             <div class="flex flex-col gap-1">
-              <label class="font-bold text-sm">เทศกาล (แก้ไขไม่ได้):</label>
-              <input type="text" id="edit-festival-name" disabled class="sketch-input w-full bg-pencil-soft/20 cursor-not-allowed">
+              <label for="edit-festival-select" class="font-bold text-sm">เลือกเทศกาลประเพณี:</label>
+              <select id="edit-festival-select" required class="sketch-input w-full">
+                <!-- Dynamically populated -->
+              </select>
             </div>
             
             <div class="flex flex-col gap-1">
@@ -140,9 +147,58 @@
             
             <div class="sketch-divider"></div>
             
+            <div class="flex justify-between items-center gap-3 flex-wrap">
+              <button type="button" id="btn-delete-edit" class="sketch-btn btn-red px-4 py-2 font-bold">ลบคำอวยพร 🗑️</button>
+              <div class="flex gap-3">
+                <button type="button" id="btn-close-edit" class="sketch-btn btn-cream px-4 py-2">ยกเลิก</button>
+                <button type="submit" class="sketch-btn btn-green px-5 py-2">บันทึกการแก้ไข 💾</button>
+              </div>
+            </div>
+          </form>
+        </div>
+      </div>
+
+      <!-- Suggest Festival Modal -->
+      <div id="suggest-festival-modal" class="hidden fixed inset-0 z-50 flex items-center justify-center bg-black/60 px-4">
+        <div class="sketch-card p-6 max-w-lg w-full bg-white relative">
+          <h3 class="text-2xl font-extrabold mb-2">🎡 เสนอชื่อเทศกาลใหม่</h3>
+          <p class="text-pencil-light text-xs mb-4">
+            💡 ส่งข้อเสนอแนะเพื่อเพิ่มเทศกาลใหม่ที่คุณชอบเข้าสู่ระบบ เมื่อผู้ดูแลระบบอนุมัติ คำอวยพรออริจินัลของคุณจะถูกเผยแพร่พร้อมกับประเพณีใหม่นั้นทันที
+          </p>
+          
+          <form id="suggest-festival-form" class="space-y-4">
+            <div class="flex flex-col gap-1">
+              <label for="suggest-name-input" class="font-bold text-sm">ชื่อเทศกาลประเพณี:</label>
+              <input type="text" id="suggest-name-input" required placeholder="เช่น เทศกาลลอยกระทง, คริสต์มาส" class="sketch-input w-full">
+            </div>
+            
+            <div class="flex flex-col gap-1">
+              <label for="suggest-desc-input" class="font-bold text-sm">รายละเอียด/คำอธิบายเทศกาล:</label>
+              <textarea id="suggest-desc-input" required rows="3" placeholder="อธิบายประเพณีหรือเทศกาลนี้โดยย่อ..." class="sketch-input w-full resize-none"></textarea>
+            </div>
+
+            <div class="flex flex-col gap-1">
+              <label for="suggest-wish-input" class="font-bold text-sm">เขียนคำอวยพรชิ้นแรก:</label>
+              <textarea id="suggest-wish-input" required rows="3" placeholder="เขียนคำอวยพรอบอุ่นใจคู่กับประเพณีนี้..." class="sketch-input w-full resize-none"></textarea>
+            </div>
+            
+            <div class="flex flex-col gap-1">
+              <label for="suggest-sig-input" class="font-bold text-sm">นามปากกาผู้เสนอ (Signature):</label>
+              <input type="text" id="suggest-sig-input" class="sketch-input w-full">
+            </div>
+            
+            <div class="flex items-center gap-2 py-1">
+              <input type="checkbox" id="suggest-anonymous-checkbox" class="accent-pencil h-4 w-4">
+              <label for="suggest-anonymous-checkbox" class="font-bold text-sm select-none cursor-pointer">
+                ส่งแบบไม่ประสงค์ออกนาม (Anonymous)
+              </label>
+            </div>
+            
+            <div class="sketch-divider"></div>
+            
             <div class="flex justify-end gap-3">
-              <button type="button" id="btn-close-edit" class="sketch-btn btn-cream px-4 py-2">ยกเลิก</button>
-              <button type="submit" class="sketch-btn btn-green px-5 py-2">บันทึกการแก้ไข 💾</button>
+              <button type="button" id="btn-close-suggest" class="sketch-btn btn-cream px-4 py-2">ยกเลิก</button>
+              <button type="submit" class="sketch-btn btn-orange px-5 py-2">ส่งข้อเสนอแนะ 🎡</button>
             </div>
           </form>
         </div>
