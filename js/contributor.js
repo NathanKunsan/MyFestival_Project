@@ -8,6 +8,7 @@ let userMessages = [];
 let editMessageObj = null;
 let userProfile = null;
 let festivalsList = [];
+let currentFilter = 'all'; // Filter messages status: 'all', 'approved', 'pending', 'rejected'
 
 
 // Initialize Page
@@ -26,6 +27,7 @@ export const init = async () => {
   setupAddMessageForm();
   setupEditModalEvents();
   setupSuggestModalEvents();
+  setupFilterEvents();
 };
 
 // Fetch festivals for dropdown select option
@@ -57,6 +59,37 @@ async function fetchFestivalsList() {
   } catch (error) {
     console.error('Error fetching festivals list:', error);
   }
+}
+
+// Set up status filter button events
+function setupFilterEvents() {
+  const filterBtns = {
+    all: document.getElementById('filter-all'),
+    approved: document.getElementById('filter-approved'),
+    pending: document.getElementById('filter-pending'),
+    rejected: document.getElementById('filter-rejected')
+  };
+  
+  Object.entries(filterBtns).forEach(([status, btn]) => {
+    btn?.addEventListener('click', () => {
+      currentFilter = status;
+      
+      // Update active styling
+      Object.entries(filterBtns).forEach(([s, b]) => {
+        if (b) {
+          if (s === currentFilter) {
+            b.classList.remove('btn-cream');
+            b.classList.add('btn-yellow');
+          } else {
+            b.classList.remove('btn-yellow');
+            b.classList.add('btn-cream');
+          }
+        }
+      });
+      
+      renderMessageList();
+    });
+  });
 }
 
 // Load contributor's statistics and message board
@@ -109,17 +142,32 @@ function renderMessageList() {
   const listContainer = document.getElementById('contributor-msg-list');
   if (!listContainer) return;
   
-  if (userMessages.length === 0) {
+  // Filter messages based on selected tab
+  let filteredMessages = userMessages;
+  if (currentFilter !== 'all') {
+    filteredMessages = userMessages.filter(m => m.status === currentFilter);
+  }
+  
+  if (filteredMessages.length === 0) {
+    let emptyMsg = 'คุณยังไม่เคยฝากคำอวยพรไว้ในระบบ เขียนชิ้นแรกที่ฟอร์มด้านซ้ายได้เลย!';
+    if (currentFilter === 'approved') {
+      emptyMsg = 'ไม่มีคำอวยพรที่ได้รับการอนุมัติในระบบ';
+    } else if (currentFilter === 'pending') {
+      emptyMsg = 'ไม่มีคำอวยพรรอตรวจสอบในระบบ';
+    } else if (currentFilter === 'rejected') {
+      emptyMsg = 'ไม่มีคำอวยพรที่ถูกปฏิเสธในระบบ';
+    }
+    
     listContainer.innerHTML = `
       <div class="text-center py-12">
         <p class="text-3xl mb-4">🍃</p>
-        <p class="text-lg font-bold text-pencil-light italic">คุณยังไม่เคยฝากคำอวยพรไว้ในระบบ เขียนชิ้นแรกที่ฟอร์มด้านซ้ายได้เลย!</p>
+        <p class="text-lg font-bold text-pencil-light italic">${emptyMsg}</p>
       </div>
     `;
     return;
   }
   
-  listContainer.innerHTML = userMessages.map(msg => {
+  listContainer.innerHTML = filteredMessages.map(msg => {
     const startStr = new Date(msg.created_at).toLocaleDateString('th-TH');
     let statusClass = 'btn-yellow';
     let statusText = '⏳ รอการตรวจสอบ';
