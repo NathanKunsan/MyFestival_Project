@@ -381,3 +381,21 @@ span.flatpickr-weekday {
   }
 }
 
+/* Hero Slider Navigation Buttons Hover fixes */
+#slider-prev,
+#slider-next {
+  transition: background-color 0.2s ease, transform 0.15s ease, box-shadow 0.15s ease;
+}
+
+#slider-prev:hover,
+#slider-next:hover {
+  transform: translateY(-50%) !important;
+  box-shadow: 2px 2px 0px 0px var(--color-pencil) !important;
+  background-color: #d2bc92 !important; /* สีครีมเข้มขึ้นอมน้ำตาล สว่างกว่าลูกศร #4a3c31 */
+}
+
+#slider-prev:active,
+#slider-next:active {
+  transform: translateY(-50%) translate(1px, 1px) !important;
+  box-shadow: 1px 1px 0px 0px var(--color-pencil) !important;
+}
