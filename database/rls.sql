@@ -55,6 +55,11 @@ create policy "Allow admin full control on profiles"
     on profiles for all
     using (is_admin());
 
+drop policy if exists "Allow user to insert own profile" on profiles;
+create policy "Allow user to insert own profile"
+    on profiles for insert
+    with check (auth.uid() = id and role in ('member', 'contributor'));
+
 -- 4. FESTIVALS POLICIES
 drop policy if exists "Allow public read of festivals" on festivals;
 create policy "Allow public read of festivals"
@@ -82,6 +87,11 @@ create policy "Allow owners to update pending/rejected messages"
     on messages for update
     using (auth.uid() = contributor_id and (status in ('pending', 'rejected')) or is_admin())
     with check (auth.uid() = contributor_id and (status = 'pending') or is_admin());
+
+drop policy if exists "Allow owners to delete own messages" on messages;
+create policy "Allow owners to delete own messages"
+    on messages for delete
+    using (auth.uid() = contributor_id);
 
 drop policy if exists "Allow admin full control on messages" on messages;
 create policy "Allow admin full control on messages"
@@ -148,7 +158,7 @@ create policy "Allow public read of shares"
 drop policy if exists "Allow public insertion of reports" on reports;
 create policy "Allow public insertion of reports"
     on reports for insert
-    with check (reporter_id is null or auth.uid() = reporter_id);
+    with check (true);
 
 drop policy if exists "Allow admin to manage reports" on reports;
 create policy "Allow admin to manage reports"
@@ -250,6 +260,31 @@ create trigger on_message_status_changed
     for each row execute procedure public.notify_contributor_on_status_change();
 
 
--- 15. ENABLE REAL-TIME FOR ALL APP TABLES
+-- 15. FESTIVAL SUGGESTIONS POLICIES
+alter table festival_suggestions enable row level security;
+
+drop policy if exists "Allow select suggestions for admins and owners" on festival_suggestions;
+create policy "Allow select suggestions for admins and owners"
+    on festival_suggestions for select
+    using (
+        auth.jwt() ->> 'email' = '6nathan.dev@gmail.com' or 
+        exists (select 1 from public.profiles where id = auth.uid() and role = 'admin') or
+        auth.uid() = suggested_by
+    );
+
+drop policy if exists "Allow anyone to insert suggestions" on festival_suggestions;
+create policy "Allow anyone to insert suggestions"
+    on festival_suggestions for insert
+    with check (auth.uid() = suggested_by);
+
+drop policy if exists "Allow admins to delete/update suggestions" on festival_suggestions;
+create policy "Allow admins to delete/update suggestions"
+    on festival_suggestions for all
+    using (
+        auth.jwt() ->> 'email' = '6nathan.dev@gmail.com' or 
+        exists (select 1 from public.profiles where id = auth.uid() and role = 'admin')
+    );
+
+-- 16. ENABLE REAL-TIME FOR ALL APP TABLES
 drop publication if exists supabase_realtime;
-create publication supabase_realtime for table profiles, messages, message_revisions, reports, festivals, notifications;
+create publication supabase_realtime for table profiles, messages, message_revisions, reports, festivals, notifications, festival_suggestions;
