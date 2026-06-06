@@ -161,6 +161,10 @@ document.addEventListener('DOMContentLoaded', async () => {
 
   // Run router for initial load
   const initialPath = window.location.hash.slice(1) || '/';
+  
+  // Initialize About System modal events
+  initAboutModalEvents();
+  
   routePage(initialPath);
 });
 
@@ -190,6 +194,75 @@ function showConfigNeeded() {
   configBanner?.classList.remove('hidden');
   // Auto open modal on clean start
   configModal?.classList.remove('hidden');
+}
+
+// Initialize About MyFestival modal events and closing handlers
+function initAboutModalEvents() {
+  const modal = document.getElementById('about-system-modal');
+  const btnCloseX = document.getElementById('btn-close-about-x');
+  const btnCloseOk = document.getElementById('btn-close-about-ok');
+  const checkbox = document.getElementById('chk-about-dismiss-forever');
+  const floatingBtn = document.getElementById('btn-floating-info');
+
+  const closeModal = () => {
+    if (checkbox && checkbox.checked) {
+      localStorage.setItem('myfestival_about_dismissed', 'true');
+    } else {
+      localStorage.removeItem('myfestival_about_dismissed');
+    }
+    modal?.classList.add('hidden');
+  };
+
+  btnCloseX?.addEventListener('click', closeModal);
+  btnCloseOk?.addEventListener('click', closeModal);
+
+  floatingBtn?.addEventListener('click', async () => {
+    await loadAboutInfo();
+    if (checkbox) {
+      checkbox.checked = localStorage.getItem('myfestival_about_dismissed') === 'true';
+    }
+    modal?.classList.remove('hidden');
+  });
+}
+
+// Load and render About MyFestival content from database
+export async function loadAboutInfo() {
+  const contentEl = document.getElementById('about-modal-content');
+  if (!contentEl) return;
+
+  const supabase = await getSupabase();
+  if (!supabase) {
+    contentEl.innerHTML = `<p class="italic text-pencil-light text-center">กำลังเชื่อมต่อฐานข้อมูล... ⏳</p>`;
+    return;
+  }
+
+  try {
+    const { data, error } = await supabase
+      .from('about_info')
+      .select('*')
+      .order('created_at', { ascending: true });
+
+    if (error) throw error;
+
+    if (data && data.length > 0) {
+      contentEl.innerHTML = data.map(item => `
+        <div class="mb-4 last:mb-0">
+          <h4 class="text-base font-extrabold text-pencil mb-1">📢 ${item.title}</h4>
+          <p class="whitespace-pre-wrap">${item.content}</p>
+        </div>
+      `).join('');
+    } else {
+      contentEl.innerHTML = `
+        <div class="text-center py-4 text-pencil-light">
+          <p class="text-2xl mb-1">ℹ️</p>
+          <p class="text-sm italic">ไม่มีข้อมูลเกี่ยวกับ MyFestival ในขณะนี้</p>
+        </div>
+      `;
+    }
+  } catch (err) {
+    console.error('Error loading about info:', err);
+    contentEl.innerHTML = `<p class="text-wood-red font-bold text-center">เกิดข้อผิดพลาดในการโหลดข้อมูล: ${err.message}</p>`;
+  }
 }
 
 // Global Toast System
@@ -269,8 +342,8 @@ function matchRoute(path) {
 
 // Load and render page views
 async function routePage(path) {
-  // Remove previous portaled modals from body (keep global #config-modal)
-  const oldModals = document.body.querySelectorAll('[id$="-modal"]:not(#config-modal)');
+  // Remove previous portaled modals from body (keep global #config-modal and #about-system-modal)
+  const oldModals = document.body.querySelectorAll('[id$="-modal"]:not(#config-modal):not(#about-system-modal)');
   oldModals.forEach(m => m.remove());
   
   // If not configured, block navigation and display fallback
@@ -353,6 +426,26 @@ async function routePage(path) {
     
     // Highlight active link in Navbar
     updateNavSelection(path);
+
+    // Show/hide floating info button (index page only: "/" or "/festival")
+    const floatingBtn = document.getElementById('btn-floating-info');
+    if (floatingBtn) {
+      if (path === '/' || path === '/festival') {
+        floatingBtn.classList.remove('hidden');
+        
+        // Auto popup on index if not dismissed forever
+        const isDismissed = localStorage.getItem('myfestival_about_dismissed') === 'true';
+        if (!isDismissed) {
+          const modal = document.getElementById('about-system-modal');
+          if (modal && modal.classList.contains('hidden')) {
+            await loadAboutInfo();
+            modal.classList.remove('hidden');
+          }
+        }
+      } else {
+        floatingBtn.classList.add('hidden');
+      }
+    }
   } catch (error) {
     console.error('Routing load error:', error);
     mainContent.innerHTML = `
