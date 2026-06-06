@@ -14,6 +14,7 @@ let festivalsSubscription = null;
 let notificationsSubscription = null;
 let suggestionsSubscription = null;
 let currentFestivalImageUrl = null;
+let aboutSubscription = null;
 
 
 // Initial Mock Data Fallbacks
@@ -209,6 +210,7 @@ export const init = async () => {
   setupMembersViewToggle();
   setupRequestEditModal();
   setupDeleteReasonModal();
+  setupAboutForm();
   
   // Subscribe to realtime changes on database tables to keep lists updated
   const supabase = await getSupabase();
@@ -334,6 +336,22 @@ export const init = async () => {
         }
       )
       .subscribe();
+    // 8. About Info Realtime
+    if (aboutSubscription) aboutSubscription.unsubscribe();
+    aboutSubscription = supabase
+      .channel('admin-about-changes')
+      .on(
+        'postgres_changes',
+        { event: '*', schema: 'public', table: 'about_info' },
+        async (payload) => {
+          console.log('About info change detected:', payload);
+          const tab = document.getElementById('tab-about');
+          if (tab && tab.classList.contains('btn-yellow')) {
+            await loadAboutTab();
+          }
+        }
+      )
+      .subscribe();
   }
   
   // Default load Approval Tab
@@ -379,6 +397,9 @@ function setupTabNavigation() {
       } else if (targetId === 'tab-members') {
         document.getElementById('panel-members').classList.remove('hidden');
         await loadMembersTab();
+      } else if (targetId === 'tab-about') {
+        document.getElementById('panel-about').classList.remove('hidden');
+        await loadAboutTab();
       }
     });
   });
@@ -1976,6 +1997,7 @@ function renderSuggestionsQueue(suggestions) {
         
         <div class="space-y-2">
           <p class="text-lg font-extrabold text-wood-orange">🎪 ชื่อที่เสนอ: ${sug.name}</p>
+          <p class="text-xs text-pencil-light font-bold">🗓️ ช่วงเวลาที่เสนอ: ${sug.start_date ? new Date(sug.start_date).toLocaleDateString('th-TH') : 'ไม่ได้ระบุ'} ถึง ${sug.end_date ? new Date(sug.end_date).toLocaleDateString('th-TH') : 'ไม่ได้ระบุ'}</p>
           <p class="text-sm font-bold text-pencil-light">📝 คำอธิบาย: ${sug.description}</p>
           ${sug.image_url ? `
           <div class="my-2 border-2 border-pencil rounded-lg overflow-hidden max-w-xs bg-pencil-soft/10">
@@ -2185,9 +2207,8 @@ async function handleApproveSuggestion(sug) {
   let dbSuccess = false;
   let dbError = null;
   
-  const startDate = new Date();
-  const endDate = new Date();
-  endDate.setDate(startDate.getDate() + 7); // Active for 7 days
+  const startDate = sug.start_date ? new Date(sug.start_date) : new Date();
+  const endDate = sug.end_date ? new Date(sug.end_date) : new Date(startDate.getTime() + 7 * 24 * 60 * 60 * 1000);
   
   if (supabase && !sug.id.startsWith('mock')) {
     try {
@@ -2256,7 +2277,7 @@ async function handleApproveSuggestion(sug) {
         id: newFestId,
         name: sug.name,
         description: sug.description,
-        image_url: 'https://images.unsplash.com/photo-1513151233558-d860c5398176?w=800',
+        image_url: sug.image_url || 'https://images.unsplash.com/photo-1513151233558-d860c5398176?w=800',
         start_date: startDate.toISOString(),
         end_date: endDate.toISOString(),
         messages: []
@@ -2583,6 +2604,191 @@ function openDeleteReasonModal(id) {
   document.getElementById('delete-reason-modal').classList.remove('hidden');
 }
 
+// About Info Management CRUD implementation
+async function loadAboutTab() {
+  const supabase = await getSupabase();
+  const listContainer = document.getElementById('admin-about-list');
+  if (!listContainer) return;
+  
+  listContainer.innerHTML = `<p class="text-pencil-light font-bold italic text-center py-6">กำลังโหลดข้อมูลข่าวสาร... ⏳</p>`;
+  
+  try {
+    const { data, error } = await supabase
+      .from('about_info')
+      .select('*')
+      .order('created_at', { ascending: false });
+      
+    if (error) throw error;
+    
+    renderAdminAboutList(data || []);
+  } catch (error) {
+    console.error('Error fetching about info:', error);
+    listContainer.innerHTML = `<p class="text-wood-red font-bold text-center">ไม่สามารถโหลดข้อมูลข่าวสารได้: ${error.message}</p>`;
+  }
+  setupAboutListEvents();
+}
+
+function renderAdminAboutList(items) {
+  const container = document.getElementById('admin-about-list');
+  if (!container) return;
+  
+  if (items.length === 0) {
+    container.innerHTML = `<p class="text-pencil-light font-bold italic text-center py-6">ไม่มีรายการข้อมูลเกี่ยวกับหรือข่าวสารในระบบ...</p>`;
+    return;
+  }
+  
+  container.innerHTML = items.map(item => `
+    <div class="sketch-card p-4 bg-white flex justify-between items-start gap-4 shadow-[2px_2px_0px_0px_#4a3c31]">
+      <div class="space-y-1">
+        <h3 class="font-extrabold text-base">📢 ${item.title}</h3>
+        <p class="text-xs whitespace-pre-wrap font-bold text-pencil-light leading-relaxed">${item.content}</p>
+        <p class="text-[9px] text-pencil-light/60 mt-1 italic">อัปเดตล่าสุด: ${new Date(item.updated_at).toLocaleString('th-TH')}</p>
+      </div>
+      <div class="flex flex-col gap-2 shrink-0">
+        <button class="sketch-btn btn-cream text-xs py-1 px-3 btn-edit-about font-bold" data-id="${item.id}">
+          แก้ไข ✏️
+        </button>
+        <button class="sketch-btn btn-red text-xs py-1 px-3 btn-delete-about font-bold" data-id="${item.id}">
+          ลบ 🗑️
+        </button>
+      </div>
+    </div>
+  `).join('');
+}
+
+function setupAboutListEvents() {
+  const editBtns = document.querySelectorAll('.btn-edit-about');
+  const deleteBtns = document.querySelectorAll('.btn-delete-about');
+  
+  editBtns.forEach(btn => {
+    btn.addEventListener('click', async () => {
+      const id = btn.getAttribute('data-id');
+      await enterEditAboutMode(id);
+    });
+  });
+  
+  deleteBtns.forEach(btn => {
+    btn.addEventListener('click', async () => {
+      const id = btn.getAttribute('data-id');
+      await handleDeleteAbout(id);
+    });
+  });
+}
+
+async function enterEditAboutMode(id) {
+  const supabase = await getSupabase();
+  try {
+    const { data, error } = await supabase
+      .from('about_info')
+      .select('*')
+      .eq('id', id)
+      .single();
+      
+    if (error) throw error;
+    
+    document.getElementById('about-id').value = id;
+    document.getElementById('about-title-input').value = data.title;
+    document.getElementById('about-content-input').value = data.content;
+    
+    document.getElementById('about-form-title').textContent = `📢 แก้ไขข่าวสาร/เกี่ยวกับ`;
+    document.getElementById('btn-submit-about').textContent = 'บันทึกการแก้ไข 💾';
+    document.getElementById('btn-submit-about').className = 'sketch-btn btn-yellow w-full py-2 text-base font-bold';
+    document.getElementById('edit-about-actions').classList.remove('hidden');
+    
+    document.getElementById('about-form-title').scrollIntoView({ behavior: 'smooth' });
+  } catch (err) {
+    console.error('Error entering edit about mode:', err);
+    showToast('ดึงรายละเอียดข้อมูลไม่สำเร็จ: ' + err.message, 'error');
+  }
+}
+
+function exitEditAboutMode() {
+  const form = document.getElementById('add-about-form');
+  if (form) form.reset();
+  
+  document.getElementById('about-id').value = '';
+  document.getElementById('about-form-title').textContent = '📢 เพิ่มข้อมูลข่าวสาร/เกี่ยวกับ';
+  document.getElementById('btn-submit-about').textContent = 'บันทึกข้อมูล 💾';
+  document.getElementById('btn-submit-about').className = 'sketch-btn btn-green w-full py-2 text-base font-bold';
+  document.getElementById('edit-about-actions').classList.add('hidden');
+}
+
+async function handleDeleteAbout(id) {
+  if (!confirm('คุณแน่ใจหรือไม่ว่าต้องการลบข้อมูลรายการนี้?')) {
+    return;
+  }
+  
+  const supabase = await getSupabase();
+  try {
+    const { error } = await supabase
+      .from('about_info')
+      .delete()
+      .eq('id', id);
+      
+    if (error) throw error;
+    
+    showToast('ลบข้อมูลเรียบร้อยแล้ว!', 'success');
+    exitEditAboutMode();
+    await loadAboutTab();
+  } catch (err) {
+    console.error('Error deleting about info:', err);
+    showToast('ไม่สามารถลบข้อมูลได้: ' + err.message, 'error');
+  }
+}
+
+function setupAboutForm() {
+  const form = document.getElementById('add-about-form');
+  if (!form) return;
+  
+  form.addEventListener('submit', async (e) => {
+    e.preventDefault();
+    const supabase = await getSupabase();
+    
+    const id = document.getElementById('about-id').value;
+    const title = document.getElementById('about-title-input').value.trim();
+    const content = document.getElementById('about-content-input').value.trim();
+    
+    const submitBtn = document.getElementById('btn-submit-about');
+    const origText = submitBtn.textContent;
+    submitBtn.disabled = true;
+    submitBtn.textContent = 'กำลังบันทึกข้อมูล...';
+    
+    try {
+      if (id) {
+        // Update
+        const { error } = await supabase
+          .from('about_info')
+          .update({ title, content })
+          .eq('id', id);
+          
+        if (error) throw error;
+        showToast('แก้ไขข้อมูลเรียบร้อยแล้ว!', 'success');
+      } else {
+        // Insert
+        const { error } = await supabase
+          .from('about_info')
+          .insert({ title, content });
+          
+        if (error) throw error;
+        showToast('เพิ่มข้อมูลใหม่เรียบร้อยแล้ว!', 'success');
+      }
+      
+      exitEditAboutMode();
+      await loadAboutTab();
+    } catch (err) {
+      console.error('Error saving about info:', err);
+      showToast('ไม่สามารถบันทึกข้อมูลได้: ' + err.message, 'error');
+    } finally {
+      submitBtn.disabled = false;
+      submitBtn.textContent = origText;
+    }
+  });
+  
+  document.getElementById('btn-cancel-edit-about')?.addEventListener('click', () => {
+    exitEditAboutMode();
+  });
+}
+
 export const cleanup = () => {
   console.log('Cleaning up admin realtime subscriptions...');
   if (profilesSubscription) {
@@ -2612,5 +2818,9 @@ export const cleanup = () => {
   if (suggestionsSubscription) {
     suggestionsSubscription.unsubscribe();
     suggestionsSubscription = null;
+  }
+  if (aboutSubscription) {
+    aboutSubscription.unsubscribe();
+    aboutSubscription = null;
   }
 };
