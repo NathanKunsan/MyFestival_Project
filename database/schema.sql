@@ -22,6 +22,7 @@ create table profiles (
     id uuid primary key references auth.users on delete cascade,
     email text unique not null,
     full_name text,
+    pending_name text,
     avatar_url text,
     role text not null default 'member' check (role in ('member', 'contributor', 'admin')),
     created_at timestamp with time zone default now() not null,
@@ -58,6 +59,7 @@ create table messages (
 create table message_revisions (
     id uuid primary key default gen_random_uuid(),
     message_id uuid not null references messages(id) on delete cascade,
+    festival_id uuid references festivals(id) on delete cascade,
     message_text text not null check (char_length(message_text) > 0),
     signature text,
     is_anonymous boolean default false not null,
@@ -134,6 +136,20 @@ create table activity_logs (
     created_at timestamp with time zone default now() not null
 );
 
+-- 12. FESTIVAL SUGGESTIONS Table
+create table festival_suggestions (
+    id uuid primary key default gen_random_uuid(),
+    name text not null,
+    description text not null,
+    suggested_wish text not null,
+    signature text,
+    is_anonymous boolean default false not null,
+    suggested_by uuid references profiles(id) on delete cascade,
+    status text not null default 'pending' check (status in ('pending', 'approved', 'rejected')),
+    created_at timestamp with time zone default now() not null,
+    updated_at timestamp with time zone default now() not null
+);
+
 -- COMMON TRIGGERS FOR updated_at
 create or replace function update_updated_at_column()
 returns trigger as $$
@@ -148,6 +164,7 @@ create trigger update_festivals_modtime before update on festivals for each row 
 create trigger update_messages_modtime before update on messages for each row execute procedure update_updated_at_column();
 create trigger update_message_revisions_modtime before update on message_revisions for each row execute procedure update_updated_at_column();
 create trigger update_reports_modtime before update on reports for each row execute procedure update_updated_at_column();
+create trigger update_festival_suggestions_modtime before update on festival_suggestions for each row execute procedure update_updated_at_column();
 
 -- AUTOMATIC PROFILE CREATION FROM auth.users
 create or replace function public.handle_new_user()
