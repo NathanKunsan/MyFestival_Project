@@ -335,6 +335,10 @@ export async function refreshAuthUI() {
                 
                 await refreshAuthUI();
                 
+                if (window.location.pathname === '/profile') {
+                  routePage('/profile');
+                }
+                
                 const accessDenied = checkAccessGuards(window.location.pathname);
                 if (accessDenied) {
                   navigate(accessDenied);
