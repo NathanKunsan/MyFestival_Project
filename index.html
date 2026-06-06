@@ -169,6 +169,38 @@
   <!-- Global Toast Element -->
   <div id="global-toast-container" class="pointer-events-none fixed bottom-6 right-6 z-50 flex flex-col gap-2"></div>
 
+  <!-- Floating Info Button (Left-Bottom corner, index page only) -->
+  <button id="btn-floating-info" class="hidden fixed bottom-6 left-6 z-40 bg-[#cce3f5] hover:bg-[#b5d6f0] border-2 border-pencil text-pencil font-black w-10 h-10 rounded-full flex items-center justify-center shadow-[2px_2px_0px_0px_#4a3c31] transition-all hover:scale-105 active:scale-95 active:shadow-none" title="เกี่ยวกับ MyFestival">
+    i
+  </button>
+
+  <!-- Global About MyFestival Popup Modal -->
+  <div id="about-system-modal" class="hidden fixed inset-0 z-50 flex items-center justify-center bg-black/60 px-4 py-6">
+    <div class="sketch-card p-6 md:p-8 max-w-lg w-full bg-white relative max-h-[90vh] overflow-y-auto">
+      <button id="btn-close-about-x" class="absolute top-4 right-4 text-pencil hover:text-wood-red font-bold text-2xl" aria-label="Close modal">×</button>
+      
+      <div class="text-center mb-4 pb-2 border-b-2 border-pencil">
+        <h2 id="about-modal-title" class="text-2xl font-extrabold">ℹ️ เกี่ยวกับ MyFestival</h2>
+      </div>
+      
+      <div id="about-modal-content" class="space-y-4 text-sm font-bold text-pencil-light leading-relaxed">
+        <!-- Loaded from DB -->
+      </div>
+      
+      <div class="sketch-divider my-4"></div>
+      
+      <div class="flex flex-col sm:flex-row justify-between items-stretch sm:items-center gap-4">
+        <label class="flex items-center gap-2 select-none cursor-pointer">
+          <input type="checkbox" id="chk-about-dismiss-forever" class="accent-pencil h-4 w-4">
+          <span class="text-xs font-black text-pencil-light">ไม่ต้องแสดงป๊อปอัปนี้อีก</span>
+        </label>
+        <button id="btn-close-about-ok" class="sketch-btn btn-blue py-1.5 px-6 font-bold text-sm">
+          ปิดหน้าต่าง
+        </button>
+      </div>
+    </div>
+  </div>
+
   <!-- Router Script Entry Point -->
   <script type="module" src="/js/router.js"></script>
 </body>
