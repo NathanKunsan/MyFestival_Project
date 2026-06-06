@@ -1,83 +1,199 @@
-<!DOCTYPE html>
-<html lang="th">
-<head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>ข้อมูลส่วนตัว — MyFestival</title>
-  <!-- Supabase CDN -->
-  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-  <!-- Tailwind CSS CDN -->
-  <script src="https://cdn.tailwindcss.com"></script>
-  <!-- Custom Sketchbook CSS -->
-  <link rel="stylesheet" href="/css/style.css">
-</head>
-<body class="bg-paper text-pencil paper-grain p-4">
+-- MyFestival Database Schema
+-- Target: Supabase (PostgreSQL)
 
-  <div id="page-content" class="w-full max-w-xl mx-auto py-6">
-    <div class="sketch-card p-6 md:p-8 bg-white">
-      <h2 class="text-3xl font-extrabold text-center mb-2">👤 ข้อมูลส่วนตัว</h2>
-      <p class="text-center text-pencil-light text-sm mb-6">แก้ไขโปรไฟล์และความต้องการใช้งานของคุณที่นี่</p>
-      
-      <!-- Profile Form -->
-      <form id="profile-form" class="space-y-4">
-        <div class="flex flex-col items-center gap-2 mb-6">
-          <div class="relative w-24 h-24 rounded-full border-4 border-pencil overflow-hidden bg-pencil-soft shadow-[3px_3px_0px_0px_#4a3c31]">
-            <img id="profile-avatar-preview" src="https://api.dicebear.com/7.x/fun-emoji/svg?seed=guest" class="w-full h-full object-cover" alt="Avatar Preview">
-          </div>
-          <span id="profile-role-badge" class="sketch-badge btn-yellow text-xs font-black uppercase mt-1">
-            ...
-          </span>
-        </div>
+-- Enable UUID extension
+create extension if not exists "uuid-ossp";
 
-        <div class="flex flex-col gap-1">
-          <label for="profile-email" class="font-bold text-sm">อีเมลผู้ใช้งาน (ไม่สามารถแก้ไขได้):</label>
-          <input type="email" id="profile-email" disabled class="sketch-input w-full bg-pencil-soft/20 cursor-not-allowed">
-        </div>
+-- Clean up existing tables if any (for fresh migration)
+drop table if exists activity_logs cascade;
+drop table if exists random_history cascade;
+drop table if exists notifications cascade;
+drop table if exists reports cascade;
+drop table if exists shares cascade;
+drop table if exists saves cascade;
+drop table if exists likes cascade;
+drop table if exists message_revisions cascade;
+drop table if exists messages cascade;
+drop table if exists festivals cascade;
+drop table if exists profiles cascade;
 
-        <div class="flex flex-col gap-1">
-          <label for="profile-name" class="font-bold text-sm">ชื่อจริง / นามปากกา:</label>
-          <input type="text" id="profile-name" required placeholder="ระบุชื่อผู้ใช้งาน" class="sketch-input w-full">
-        </div>
+-- 1. PROFILES Table (Extends auth.users)
+create table profiles (
+    id uuid primary key references auth.users on delete cascade,
+    email text unique not null,
+    full_name text,
+    pending_name text,
+    avatar_url text,
+    role text not null default 'member' check (role in ('member', 'contributor', 'admin')),
+    created_at timestamp with time zone default now() not null,
+    updated_at timestamp with time zone default now() not null
+);
 
-        <div class="flex flex-col gap-1">
-          <label for="profile-avatar-url" class="font-bold text-sm">ลิงก์รูปโปรไฟล์ (Avatar URL):</label>
-          <input type="url" id="profile-avatar-url" placeholder="https://example.com/avatar.jpg" class="sketch-input w-full">
-          <span class="text-xs text-pencil-light font-bold">💡 สามารถเว้นว่างไว้เพื่อสุ่มใช้ Fun Emoji จาก Dicebear</span>
-        </div>
+-- 2. FESTIVALS Table
+create table festivals (
+    id uuid primary key default gen_random_uuid(),
+    name text not null,
+    description text,
+    image_url text,
+    start_date timestamp with time zone not null,
+    end_date timestamp with time zone not null,
+    created_at timestamp with time zone default now() not null,
+    updated_at timestamp with time zone default now() not null
+);
 
-        <div id="profile-role-section" class="flex flex-col gap-1">
-          <label class="font-bold text-sm mb-1">บทบาทผู้ใช้งาน (Role):</label>
-          <div id="profile-role-container" class="grid grid-cols-2 gap-3">
-            <label class="flex items-center gap-2 p-3 border-2 border-pencil rounded-lg cursor-pointer bg-wood-yellow/10 hover:bg-wood-yellow/20">
-              <input type="radio" name="profile-role" value="member" class="accent-pencil">
-              <div class="text-sm font-bold">
-                <div>Member (ผู้อ่าน)</div>
-                <span class="text-xs text-pencil-light font-normal">เน้นการสุ่มรับพรและเซฟการ์ด</span>
-              </div>
-            </label>
-            <label class="flex items-center gap-2 p-3 border-2 border-pencil rounded-lg cursor-pointer bg-wood-orange/10 hover:bg-wood-orange/20">
-              <input type="radio" name="profile-role" value="contributor" class="accent-pencil">
-              <div class="text-sm font-bold">
-                <div>Contributor (ผู้ส่งมอบ)</div>
-                <span class="text-xs text-pencil-light font-normal">เขียนและอนุมัติคำอวยพรร่วมกัน</span>
-              </div>
-            </label>
-          </div>
-          <!-- Admin lock explanation if user is admin -->
-          <p id="admin-notice" class="hidden text-xs text-wood-red font-black mt-1">
-            🔒 คุณเป็นผู้ดูแลระบบ (Admin) ไม่สามารถปรับลดระดับบทบาทของตนเองได้
-          </p>
-        </div>
+-- 3. MESSAGES Table
+create table messages (
+    id uuid primary key default gen_random_uuid(),
+    festival_id uuid not null references festivals(id) on delete cascade,
+    contributor_id uuid not null references profiles(id) on delete cascade,
+    message_text text not null check (char_length(message_text) > 0),
+    signature text,
+    is_anonymous boolean default false not null,
+    status text not null default 'pending' check (status in ('pending', 'approved', 'rejected')),
+    rejection_reason text,
+    created_at timestamp with time zone default now() not null,
+    updated_at timestamp with time zone default now() not null
+);
 
-        <div class="sketch-divider"></div>
-        
-        <div class="flex gap-3 justify-end">
-          <a href="/" class="sketch-btn btn-cream px-5 py-2">ยกเลิก</a>
-          <button type="submit" class="sketch-btn btn-green px-6 py-2">บันทึกข้อมูลส่วนตัว 💾</button>
-        </div>
-      </form>
-    </div>
-  </div>
+-- 4. MESSAGE REVISIONS Table
+create table message_revisions (
+    id uuid primary key default gen_random_uuid(),
+    message_id uuid not null references messages(id) on delete cascade,
+    festival_id uuid references festivals(id) on delete cascade,
+    message_text text not null check (char_length(message_text) > 0),
+    signature text,
+    is_anonymous boolean default false not null,
+    status text not null default 'pending' check (status in ('pending', 'approved', 'rejected')),
+    rejection_reason text,
+    created_at timestamp with time zone default now() not null,
+    updated_at timestamp with time zone default now() not null
+);
 
-</body>
-</html>
+-- 5. LIKES Table (1 like per user per message)
+create table likes (
+    id uuid primary key default gen_random_uuid(),
+    user_id uuid not null references profiles(id) on delete cascade,
+    message_id uuid not null references messages(id) on delete cascade,
+    created_at timestamp with time zone default now() not null,
+    constraint unique_user_message_like unique (user_id, message_id)
+);
+
+-- 6. SAVES Table (Bookmark wishes)
+create table saves (
+    id uuid primary key default gen_random_uuid(),
+    user_id uuid not null references profiles(id) on delete cascade,
+    message_id uuid not null references messages(id) on delete cascade,
+    created_at timestamp with time zone default now() not null,
+    constraint unique_user_message_save unique (user_id, message_id)
+);
+
+-- 7. SHARES Table
+create table shares (
+    id uuid primary key default gen_random_uuid(),
+    message_id uuid not null references messages(id) on delete cascade,
+    share_type text not null check (share_type in ('url', 'card')),
+    created_at timestamp with time zone default now() not null
+);
+
+-- 8. REPORTS Table
+create table reports (
+    id uuid primary key default gen_random_uuid(),
+    reporter_id uuid references profiles(id) on delete set null,
+    message_id uuid not null references messages(id) on delete cascade,
+    reason text not null check (char_length(reason) > 0),
+    status text not null default 'pending' check (status in ('pending', 'resolved')),
+    created_at timestamp with time zone default now() not null,
+    updated_at timestamp with time zone default now() not null
+);
+
+-- 9. NOTIFICATIONS Table
+create table notifications (
+    id uuid primary key default gen_random_uuid(),
+    user_id uuid references profiles(id) on delete cascade, -- null indicates system/admin notifications
+    title text not null,
+    content text not null,
+    is_read boolean default false not null,
+    type text not null check (type in ('report', 'approval', 'rejection', 'system')),
+    created_at timestamp with time zone default now() not null
+);
+
+-- 10. RANDOM HISTORY Table (For duplicate prevention)
+create table random_history (
+    id uuid primary key default gen_random_uuid(),
+    user_id uuid not null references profiles(id) on delete cascade,
+    festival_id uuid not null references festivals(id) on delete cascade,
+    message_id uuid not null references messages(id) on delete cascade,
+    created_at timestamp with time zone default now() not null,
+    constraint unique_user_festival_message_history unique (user_id, festival_id, message_id)
+);
+
+-- 11. ACTIVITY LOGS Table
+create table activity_logs (
+    id uuid primary key default gen_random_uuid(),
+    user_id uuid references profiles(id) on delete set null,
+    action text not null,
+    details jsonb default '{}'::jsonb not null,
+    created_at timestamp with time zone default now() not null
+);
+
+-- 12. FESTIVAL SUGGESTIONS Table
+create table festival_suggestions (
+    id uuid primary key default gen_random_uuid(),
+    name text not null,
+    description text not null,
+    suggested_wish text not null,
+    signature text,
+    is_anonymous boolean default false not null,
+    suggested_by uuid references profiles(id) on delete cascade,
+    image_url text,
+    status text not null default 'pending' check (status in ('pending', 'approved', 'rejected')),
+    created_at timestamp with time zone default now() not null,
+    updated_at timestamp with time zone default now() not null
+);
+
+-- COMMON TRIGGERS FOR updated_at
+create or replace function update_updated_at_column()
+returns trigger as $$
+begin
+    new.updated_at = now();
+    return new;
+end;
+$$ language plpgsql;
+
+create trigger update_profiles_modtime before update on profiles for each row execute procedure update_updated_at_column();
+create trigger update_festivals_modtime before update on festivals for each row execute procedure update_updated_at_column();
+create trigger update_messages_modtime before update on messages for each row execute procedure update_updated_at_column();
+create trigger update_message_revisions_modtime before update on message_revisions for each row execute procedure update_updated_at_column();
+create trigger update_reports_modtime before update on reports for each row execute procedure update_updated_at_column();
+create trigger update_festival_suggestions_modtime before update on festival_suggestions for each row execute procedure update_updated_at_column();
+
+-- AUTOMATIC PROFILE CREATION FROM auth.users
+create or replace function public.handle_new_user()
+returns trigger as $$
+begin
+    insert into public.profiles (id, email, full_name, avatar_url, role)
+    values (
+        new.id,
+        new.email,
+        coalesce(new.raw_user_meta_data->>'full_name', new.raw_user_meta_data->>'name', split_part(new.email, '@', 1)),
+        coalesce(new.raw_user_meta_data->>'avatar_url', new.raw_user_meta_data->>'picture', ''),
+        case
+            when new.email = '6nathan.dev@gmail.com' then 'admin'
+            else 
+                case
+                    when new.raw_user_meta_data->>'role' = 'contributor' then 'contributor'
+                    else 'member'
+                end
+        end
+    );
+    return new;
+end;
+$$ language plpgsql security definer;
+
+drop trigger if exists on_auth_user_created on auth.users;
+
+create trigger on_auth_user_created
+    after insert on auth.users
+    for each row execute procedure public.handle_new_user();
+
+
