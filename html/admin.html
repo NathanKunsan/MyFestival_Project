@@ -81,8 +81,9 @@
           <!-- Form to Add Festival -->
           <div class="lg:col-span-1">
             <div class="sketch-card p-6 bg-white shadow-[4px_4px_0px_0px_#4a3c31]">
-              <h2 class="text-xl font-extrabold mb-4 pb-2 border-b-2 border-pencil">🎡 เพิ่มเทศกาลใหม่</h2>
+              <h2 id="festival-form-title" class="text-xl font-extrabold mb-4 pb-2 border-b-2 border-pencil">🎡 เพิ่มเทศกาลใหม่</h2>
               <form id="add-festival-form" class="space-y-4">
+                <input type="hidden" id="fest-id" value="">
                 <div class="flex flex-col gap-1">
                   <label for="fest-name" class="font-bold text-sm">ชื่อเทศกาล:</label>
                   <input type="text" id="fest-name" required placeholder="เช่น วันขึ้นปีใหม่, ลอยกระทง" class="sketch-input w-full">
@@ -108,9 +109,18 @@
                   <input type="text" id="fest-end" required readonly placeholder="คลิกเพื่อเลือกวันและเวลา... 📅" class="sketch-input w-full cursor-pointer bg-white">
                 </div>
                 
-                <button type="submit" class="sketch-btn btn-green w-full py-2 text-base font-bold">
+                <button type="submit" id="btn-submit-festival" class="sketch-btn btn-green w-full py-2 text-base font-bold">
                   สร้างเทศกาลเข้าระบบ 💾
                 </button>
+                
+                <div id="edit-festival-actions" class="hidden space-y-2 pt-2 border-t-2 border-dashed border-pencil/30">
+                  <button type="button" id="btn-cancel-edit-festival" class="sketch-btn btn-cream w-full py-2 text-base font-bold">
+                    ยกเลิกการแก้ไข ❌
+                  </button>
+                  <button type="button" id="btn-delete-festival" class="sketch-btn btn-red w-full py-2 text-base font-bold">
+                    ลบเทศกาลนี้ 🗑️
+                  </button>
+                </div>
               </form>
             </div>
           </div>
