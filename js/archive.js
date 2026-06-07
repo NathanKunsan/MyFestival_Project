@@ -11,7 +11,27 @@ export const init = async () => {
   
   await fetchArchivedFestivals(supabase);
   setupSearchFilter();
+  setupLockEvents();
 };
+
+function setupLockEvents() {
+  const grid = document.getElementById('archive-grid');
+  if (grid && !grid.dataset.listenerAttached) {
+    grid.dataset.listenerAttached = 'true';
+    grid.addEventListener('click', (e) => {
+      const upcomingBtn = e.target.closest('.btn-upcoming-lock');
+      const endedBtn = e.target.closest('.btn-ended-lock');
+      
+      if (upcomingBtn) {
+        e.preventDefault();
+        showToast('เทศกาลนี้ยังไม่เริ่มจัดงาน ไม่สามารถสุ่มคำอวยพรได้ครับ ⏳', 'warning');
+      } else if (endedBtn) {
+        e.preventDefault();
+        showToast('เทศกาลนี้ได้สิ้นสุดลงแล้ว ไม่สามารถสุ่มคำอวยพรได้ครับ 💾', 'warning');
+      }
+    });
+  }
+}
 
 // Helper for mock festivals data fallback
 const getMockFestivals = () => {
@@ -148,9 +168,18 @@ function renderArchiveList(list) {
           
           <div class="flex justify-between items-center pt-2">
             <span class="text-xs font-bold text-wood-orange">💌 ${approvedCount} คำอวยพร</span>
-            <a href="/message/${festival.id}" class="sketch-btn btn-yellow text-xs py-1 px-3">
-              🎲 เปิดอ่านสมุดคำอวยพร
-            </a>
+            ${startDate > now
+              ? `<button class="sketch-btn btn-cream text-xs py-1 px-3 opacity-60 btn-upcoming-lock">
+                   ⏳ ยังไม่เริ่มจัดงาน
+                 </button>`
+              : endDate < now
+                ? `<button class="sketch-btn btn-cream text-xs py-1 px-3 opacity-60 btn-ended-lock">
+                     💾 สิ้นสุดเทศกาลแล้ว
+                   </button>`
+                : `<a href="/message/${festival.id}" class="sketch-btn btn-yellow text-xs py-1 px-3">
+                     🎲 สุ่มรับคำอวยพร
+                   </a>`
+            }
           </div>
         </div>
       </div>
