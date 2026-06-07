@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>ตกแต่งและดาวน์โหลดรูปการ์ด — MyFestival</title>
+  <title>MyFestival</title>
   <!-- Supabase CDN -->
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
   <!-- Tailwind CSS CDN -->
@@ -39,6 +39,19 @@
               
               <!-- Paper Pattern Overlay (Injected via JS classes) -->
               <div id="paper-pattern-overlay" class="absolute inset-0 pointer-events-none opacity-20 rounded-[inherit]"></div>
+              <!-- Spiral Rings Element (Shown only when spiral pattern is active) -->
+              <div id="paper-spiral-rings" class="hidden absolute left-[6px] top-[10px] bottom-[10px] w-[20px] text-[#7c6858] font-normal text-[16px] leading-[1.55] z-20 opacity-80 whitespace-pre pointer-events-none">➰
+➰
+➰
+➰
+➰
+➰
+➰
+➰
+➰
+➰
+➰
+➰</div>
               
               <!-- Card Content -->
               <div class="relative z-10 flex-grow flex flex-col justify-center">
@@ -64,8 +77,8 @@
             <!-- 1. Color Picker -->
             <div class="space-y-2.5 mb-6">
               <label class="font-bold text-sm block">1. เลือกสีกระดาษ (Paper Color):</label>
-              <div class="flex flex-wrap gap-2.5">
-                <!-- Colors represent pastel tones -->
+              <div id="paper-colors-row" class="flex flex-wrap gap-2.5 items-center">
+                <!-- Preset Colors (5 colors) -->
                 <button type="button" class="color-swatch w-10 h-10 rounded-full border-2 border-pencil focus:scale-110 shadow-[2px_2px_0px_var(--color-pencil)] active:translate-x-[1px] active:translate-y-[1px] active:shadow-none transition-all" 
                         style="background-color: #fffefb;" data-color="#fffefb" title="สีขาวครีม"></button>
                 <button type="button" class="color-swatch w-10 h-10 rounded-full border-2 border-pencil focus:scale-110 shadow-[2px_2px_0px_var(--color-pencil)] active:translate-x-[1px] active:translate-y-[1px] active:shadow-none transition-all" 
@@ -76,8 +89,12 @@
                         style="background-color: #e2ece9;" data-color="#e2ece9" title="สีเขียวพาสเทล"></button>
                 <button type="button" class="color-swatch w-10 h-10 rounded-full border-2 border-pencil focus:scale-110 shadow-[2px_2px_0px_var(--color-pencil)] active:translate-x-[1px] active:translate-y-[1px] active:shadow-none transition-all" 
                         style="background-color: #f0e6ef;" data-color="#f0e6ef" title="สีม่วงพาสเทล"></button>
-                <button type="button" class="color-swatch w-10 h-10 rounded-full border-2 border-pencil focus:scale-110 shadow-[2px_2px_0px_var(--color-pencil)] active:translate-x-[1px] active:translate-y-[1px] active:shadow-none transition-all" 
-                        style="background-color: #fceade;" data-color="#fceade" title="สีส้มพาสเทล"></button>
+                
+                <!-- Dynamic custom colors list -->
+                <div id="user-colors-list" class="flex flex-wrap gap-2.5 items-center"></div>
+
+                <!-- Add color (+) button -->
+                <button type="button" id="btn-open-color-picker" class="hidden w-10 h-10 rounded-full border-2 border-dashed border-pencil/60 hover:border-pencil hover:bg-pencil-soft/30 flex items-center justify-center text-lg font-black focus:scale-110 shadow-[1.5px_1.5px_0px_var(--color-pencil)] active:translate-x-[1px] active:translate-y-[1px] active:shadow-none transition-all" title="เพิ่มสีกำหนดเอง">+</button>
               </div>
             </div>
 
@@ -94,8 +111,8 @@
                 <button type="button" class="pattern-btn sketch-btn btn-cream text-xs py-1.5 font-bold" data-pattern="grid">
                   กระดาษตาราง
                 </button>
-                <button type="button" class="pattern-btn sketch-btn btn-cream text-xs py-1.5 font-bold" data-pattern="dotted">
-                  ลายจุด (Dots)
+                <button type="button" class="pattern-btn sketch-btn btn-cream text-xs py-1.5 font-bold" data-pattern="spiral">
+                  สมุดห่วงเหล็ก
                 </button>
               </div>
             </div>
@@ -118,29 +135,36 @@
     </div>
   </div>
 
-  <!-- Custom Patterns CSS (Embedded here for standalone pattern rendering) -->
-  <style>
-    /* 1. Lined pattern */
-    .pattern-lined {
-      background-image: linear-gradient(var(--color-pencil-soft) 1px, transparent 1px) !important;
-      background-size: 100% 28px !important;
-      line-height: 28px !important;
-    }
-    
-    /* 2. Grid pattern */
-    .pattern-grid {
-      background-image: 
-        linear-gradient(var(--color-pencil-soft) 1px, transparent 1px),
-        linear-gradient(90deg, var(--color-pencil-soft) 1px, transparent 1px) !important;
-      background-size: 20px 20px !important;
-    }
-    
-    /* 3. Dotted pattern */
-    .pattern-dotted {
-      background-image: radial-gradient(var(--color-pencil-soft) 1.5px, transparent 1.5px) !important;
-      background-size: 16px 16px !important;
-    }
-  </style>
+
+
+  <!-- Add Custom Color Modal -->
+  <div id="add-color-modal" class="hidden fixed inset-0 z-50 flex items-center justify-center bg-black/60 px-4">
+    <div class="sketch-card p-6 max-w-sm w-full bg-white relative">
+      <button id="btn-close-color-modal-x" class="absolute top-4 right-4 text-pencil hover:text-wood-red font-bold text-2xl" aria-label="Close modal">×</button>
+      
+      <h3 class="text-xl font-extrabold mb-4 pb-2 border-b-2 border-pencil text-center">🎨 ผสมสีกระดาษใหม่</h3>
+      
+      <form id="add-color-form" class="space-y-4">
+        <div class="flex flex-col items-center gap-3">
+          <label class="font-bold text-sm">เลือกสีหรือกรอกรหัสสี:</label>
+          <div class="flex items-center gap-4">
+            <input type="color" id="user-color-picker" class="w-16 h-16 rounded-full border-4 border-pencil cursor-pointer bg-transparent shadow-[3px_3px_0px_var(--color-pencil)]" value="#ffffff">
+            <div class="flex flex-col gap-1">
+              <label for="user-color-hex" class="font-bold text-xs text-pencil-light">รหัสสี HEX:</label>
+              <input type="text" id="user-color-hex" placeholder="#FFFFFF" class="sketch-input text-sm py-1 px-3 w-32 uppercase font-bold text-center" maxlength="7">
+            </div>
+          </div>
+        </div>
+        
+        <div class="sketch-divider"></div>
+        
+        <div class="flex justify-end gap-3">
+          <button type="button" id="btn-close-color-modal" class="sketch-btn btn-cream px-4 py-1.5 text-sm">ยกเลิก</button>
+          <button type="submit" class="sketch-btn btn-yellow px-5 py-1.5 text-sm font-bold">บันทึกสีนี้ 💾</button>
+        </div>
+      </form>
+    </div>
+  </div>
 
 </body>
 </html>
