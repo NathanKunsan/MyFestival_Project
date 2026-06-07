@@ -53,7 +53,8 @@ create policy "Allow user to update own profile"
 drop policy if exists "Allow admin full control on profiles" on profiles;
 create policy "Allow admin full control on profiles"
     on profiles for all
-    using (is_admin());
+    using (is_admin())
+    with check (is_admin());
 
 drop policy if exists "Allow user to insert own profile" on profiles;
 create policy "Allow user to insert own profile"
@@ -69,7 +70,8 @@ create policy "Allow public read of festivals"
 drop policy if exists "Allow admin full control on festivals" on festivals;
 create policy "Allow admin full control on festivals"
     on festivals for all
-    using (is_admin());
+    using (is_admin())
+    with check (is_admin());
 
 -- 5. MESSAGES POLICIES
 drop policy if exists "Allow public read of approved messages" on messages;
@@ -96,7 +98,8 @@ create policy "Allow owners to delete own messages"
 drop policy if exists "Allow admin full control on messages" on messages;
 create policy "Allow admin full control on messages"
     on messages for all
-    using (is_admin());
+    using (is_admin())
+    with check (is_admin());
 
 -- 6. MESSAGE REVISIONS POLICIES
 drop policy if exists "Allow owner and admin to view revisions" on message_revisions;
@@ -122,7 +125,8 @@ create policy "Allow owner to insert revisions"
 drop policy if exists "Allow admin full control on revisions" on message_revisions;
 create policy "Allow admin full control on revisions"
     on message_revisions for all
-    using (is_admin());
+    using (is_admin())
+    with check (is_admin());
 
 -- 7. LIKES POLICIES
 drop policy if exists "Allow public read of likes" on likes;
@@ -163,7 +167,8 @@ create policy "Allow public insertion of reports"
 drop policy if exists "Allow admin to manage reports" on reports;
 create policy "Allow admin to manage reports"
     on reports for all
-    using (is_admin());
+    using (is_admin())
+    with check (is_admin());
 
 -- 11. NOTIFICATIONS POLICIES
 drop policy if exists "Allow users to read/update own notifications" on notifications;
@@ -283,6 +288,10 @@ create policy "Allow admins to delete/update suggestions"
     using (
         auth.jwt() ->> 'email' = '6nathan.dev@gmail.com' or 
         exists (select 1 from public.profiles where id = auth.uid() and role = 'admin')
+    )
+    with check (
+        auth.jwt() ->> 'email' = '6nathan.dev@gmail.com' or 
+        exists (select 1 from public.profiles where id = auth.uid() and role = 'admin')
     );
 
 -- 16. ABOUT INFO POLICIES
@@ -297,6 +306,10 @@ drop policy if exists "Allow admin full control on about_info" on about_info;
 create policy "Allow admin full control on about_info"
     on about_info for all
     using (
+        auth.jwt() ->> 'email' = '6nathan.dev@gmail.com' or 
+        exists (select 1 from public.profiles where id = auth.uid() and role = 'admin')
+    )
+    with check (
         auth.jwt() ->> 'email' = '6nathan.dev@gmail.com' or 
         exists (select 1 from public.profiles where id = auth.uid() and role = 'admin')
     );
