@@ -545,3 +545,36 @@ span.flatpickr-weekday {
   transform: translateY(-50%) translate(1px, 1px) !important;
   box-shadow: 1px 1px 0px 0px var(--color-pencil) !important;
 }
+
+/* Custom Card Paper Patterns */
+#paper-pattern-overlay {
+  opacity: 0.45 !important;
+}
+
+/* 1. Lined pattern */
+.pattern-lined {
+  background-image: linear-gradient(#dbcaab 1px, transparent 1px) !important;
+  background-size: 100% 28px !important;
+  line-height: 28px !important;
+}
+
+/* 2. Grid pattern */
+.pattern-grid {
+  background-image: 
+    linear-gradient(#dbcaab 1px, transparent 1px),
+    linear-gradient(90deg, #dbcaab 1px, transparent 1px) !important;
+  background-size: 20px 20px !important;
+}
+
+/* 3. Spiral notebook pattern */
+.pattern-spiral {
+  background-image: 
+    radial-gradient(circle at 14px 14px, #7c6858 3.5px, transparent 4.5px),
+    linear-gradient(90deg, transparent 38px, rgba(232, 139, 116, 0.6) 38px, rgba(232, 139, 116, 0.6) 40px, transparent 40px) !important;
+  background-size: 40px 28px, 100% 100% !important;
+  background-position: 0 0, 0 0 !important;
+  background-repeat: repeat-y, no-repeat !important;
+}
+.pattern-spiral-pad {
+  padding-left: 3.5rem !important;
+}
