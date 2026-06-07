@@ -200,7 +200,7 @@ async function drawRandomMessage(festivalId) {
     currentMessage = targetMessage;
     
     // Replace URL in address bar to represent the actual message ID for sharing, without reload
-    window.history.replaceState({}, '', `/message/${currentMessage.id}`);
+    window.history.replaceState({}, '', `/#/message/${currentMessage.id}`);
     
     await renderMessageCard();
   } catch (error) {
