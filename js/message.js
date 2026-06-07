@@ -42,8 +42,13 @@ export const init = async (params) => {
       currentFestival = festival;
       const now = new Date();
       const startDate = new Date(festival.start_date);
+      const endDate = new Date(festival.end_date);
       if (startDate > now) {
         renderErrorState('เทศกาลนี้ยังไม่ถึงเวลาเริ่มจัดงาน ไม่สามารถสุ่มเปิดรับคำอวยพรล่วงหน้าได้ครับ ⏳');
+        return;
+      }
+      if (endDate < now) {
+        renderErrorState('เทศกาลนี้ได้สิ้นสุดลงแล้ว ไม่สามารถสุ่มคำอวยพรได้ครับ 💾');
         return;
       }
       document.getElementById('festival-title').textContent = `🎈 ${festival.name}`;
@@ -195,6 +200,15 @@ async function renderMessageCard() {
   
   // Show controller buttons
   controls.classList.remove('hidden');
+  
+  const drawRandomBtn = document.getElementById('btn-draw-random');
+  if (drawRandomBtn) {
+    if (currentFestival && new Date(currentFestival.end_date) < new Date()) {
+      drawRandomBtn.classList.add('hidden');
+    } else {
+      drawRandomBtn.classList.remove('hidden');
+    }
+  }
   
   // Load interaction metrics
   const likesCount = await getLikesCount(currentMessage.id);
