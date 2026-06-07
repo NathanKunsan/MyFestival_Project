@@ -345,6 +345,37 @@ function setupSliderEvents() {
     currentSliderIndex = (currentSliderIndex + 1) % festivalsData.length;
     updateSliderContent();
   });
+
+  // Touch swipe events for mobile support
+  const heroSlider = document.getElementById('hero-slider');
+  if (heroSlider) {
+    let touchStartX = 0;
+    let touchEndX = 0;
+    
+    heroSlider.addEventListener('touchstart', (e) => {
+      touchStartX = e.changedTouches[0].screenX;
+    }, { passive: true });
+    
+    heroSlider.addEventListener('touchend', (e) => {
+      touchEndX = e.changedTouches[0].screenX;
+      handleSwipe();
+    }, { passive: true });
+    
+    function handleSwipe() {
+      const swipeDistance = touchEndX - touchStartX;
+      if (swipeDistance < -50) {
+        // Swipe left -> Next slide
+        if (festivalsData.length === 0) return;
+        currentSliderIndex = (currentSliderIndex + 1) % festivalsData.length;
+        updateSliderContent();
+      } else if (swipeDistance > 50) {
+        // Swipe right -> Prev slide
+        if (festivalsData.length === 0) return;
+        currentSliderIndex = (currentSliderIndex - 1 + festivalsData.length) % festivalsData.length;
+        updateSliderContent();
+      }
+    }
+  }
 }
 
 // Date Formatting Helper
