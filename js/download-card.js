@@ -1,9 +1,12 @@
 // MyFestival - Card Downloader Controller
 import { getSupabase } from './supabase.js';
 import { navigate, showToast } from './router.js';
+import { getCurrentUser } from './auth.js';
 
 let currentFestivalId = null;
 let currentWishId = null;
+let currentUser = null;
+let customColors = [];
 
 // Initialize Card Downloader Page
 export const init = async () => {
@@ -17,11 +20,32 @@ export const init = async () => {
   }
   
   currentWishId = wishId;
-  const supabase = await getSupabase();
-  if (!supabase) return;
   
-  await fetchAndRenderWish(supabase, wishId);
+  // Set up interactive customizer events immediately so UI is responsive
   setupCustomizerEvents();
+
+  // Load database details asynchronously in the background
+  getSupabase().then(async (supabase) => {
+    if (!supabase) {
+      console.warn('Supabase not configured, cannot load wish or database colors.');
+      return;
+    }
+    
+    // Fetch wish details immediately (no need to wait for user session)
+    fetchAndRenderWish(supabase, wishId);
+    
+    // Fetch user and load colors in background
+    getCurrentUser().then((user) => {
+      currentUser = user;
+      loadCustomColors(supabase);
+    }).catch((err) => {
+      console.warn('Error loading current user details, proceeding as guest:', err);
+      currentUser = null;
+      loadCustomColors(supabase);
+    });
+  }).catch((err) => {
+    console.error('Error during background initialization of Supabase details:', err);
+  });
 };
 
 async function fetchAndRenderWish(supabase, wishId) {
@@ -53,18 +77,174 @@ async function fetchAndRenderWish(supabase, wishId) {
   }
 }
 
+async function loadCustomColors(supabase) {
+  const plusBtn = document.getElementById('btn-open-color-picker');
+  
+  // Show plus button for everyone (both logged in and guest users)
+  if (plusBtn) plusBtn.classList.remove('hidden');
+
+  if (currentUser) {
+    try {
+      const { data, error } = await supabase
+        .from('profiles')
+        .select('custom_colors')
+        .eq('id', currentUser.id)
+        .single();
+      
+      if (error) throw error;
+      
+      if (data && data.custom_colors) {
+        customColors = data.custom_colors.split(',').map(c => c.trim()).filter(Boolean);
+      } else {
+        // If table query is OK but data is null, fallback to localstorage
+        const localColors = localStorage.getItem(`myfestival_custom_colors_${currentUser.id}`);
+        customColors = localColors ? localColors.split(',').map(c => c.trim()).filter(Boolean) : [];
+      }
+    } catch (err) {
+      console.warn('Could not load custom colors from profiles database table, using LocalStorage fallback:', err);
+      const localColors = localStorage.getItem(`myfestival_custom_colors_${currentUser.id}`);
+      customColors = localColors ? localColors.split(',').map(c => c.trim()).filter(Boolean) : [];
+    }
+  } else {
+    // Guest user fallback to LocalStorage
+    const guestColors = localStorage.getItem('myfestival_custom_colors_guest');
+    customColors = guestColors ? guestColors.split(',').map(c => c.trim()).filter(Boolean) : [];
+  }
+  renderCustomColors();
+}
+
+function renderCustomColors() {
+  const list = document.getElementById('user-colors-list');
+  if (!list) return;
+
+  list.innerHTML = customColors.map((color, index) => `
+    <div class="relative group inline-block">
+      <button type="button" class="color-swatch custom-swatch w-10 h-10 rounded-full border-2 border-pencil focus:scale-110 shadow-[2px_2px_0px_var(--color-pencil)] active:translate-x-[1px] active:translate-y-[1px] active:shadow-none transition-all" 
+              style="background-color: ${color};" data-color="${color}"></button>
+      <button type="button" class="btn-delete-color absolute -top-1 -right-1 bg-wood-red border border-pencil text-[9px] font-black w-4 h-4 rounded-full flex items-center justify-center shadow-[1px_1px_0px_0px_#4a3c31] hover:scale-110 active:scale-95" data-index="${index}" title="ลบสี">×</button>
+    </div>
+  `).join('');
+
+  // Manage plus button visibility based on color count limit
+  const plusBtn = document.getElementById('btn-open-color-picker');
+  if (plusBtn) {
+    if (customColors.length >= 5) {
+      plusBtn.classList.add('hidden');
+    } else {
+      plusBtn.classList.remove('hidden');
+    }
+  }
+
+  // Setup click triggers on all color swatches (preset & custom)
+  const cardArea = document.getElementById('capture-card-area');
+  const swatches = document.querySelectorAll('.color-swatch');
+  
+  document.querySelectorAll('.custom-swatch').forEach(swatch => {
+    swatch.addEventListener('click', () => {
+      swatches.forEach(s => s.classList.remove('scale-110', 'ring-4', 'ring-pencil/30'));
+      swatch.classList.add('scale-110', 'ring-4', 'ring-pencil/30');
+      const color = swatch.getAttribute('data-color');
+      if (cardArea) {
+        cardArea.style.backgroundColor = color;
+      }
+    });
+  });
+
+  // Attach delete triggers
+  list.querySelectorAll('.btn-delete-color').forEach(btn => {
+    btn.addEventListener('click', async (e) => {
+      e.stopPropagation();
+      const index = parseInt(btn.getAttribute('data-index'));
+      if (isNaN(index)) return;
+
+      customColors.splice(index, 1);
+      await saveCustomColorsToDB();
+    });
+  });
+}
+
+async function saveCustomColorsToDB() {
+  const colorStr = customColors.join(',');
+
+  if (currentUser) {
+    // Sync to Supabase in the background (no await!)
+    getSupabase().then(supabase => {
+      if (supabase) {
+        supabase
+          .from('profiles')
+          .update({ custom_colors: colorStr })
+          .eq('id', currentUser.id)
+          .then(({ error }) => {
+            if (error) console.warn('Error syncing custom colors to profile:', error);
+          });
+      }
+    }).catch(err => {
+      console.warn('Error getting Supabase instance for background sync:', err);
+    });
+    localStorage.setItem(`myfestival_custom_colors_${currentUser.id}`, colorStr);
+  } else {
+    localStorage.setItem('myfestival_custom_colors_guest', colorStr);
+  }
+  renderCustomColors();
+}
+
+async function handleAddCustomColor(e) {
+  e.preventDefault();
+
+  if (customColors.length >= 5) {
+    showToast('บันทึกสีกำหนดเองได้สูงสุด 5 สีเท่านั้นครับ 🎨', 'warning');
+    return;
+  }
+
+  const hexInput = document.getElementById('user-color-hex');
+  const color = hexInput?.value.trim();
+
+  if (!/^#[0-9A-F]{6}$/i.test(color)) {
+    showToast('รหัสสีไม่ถูกต้อง รูปแบบต้องระบุเป็น #RRGGBB 🎨', 'error');
+    return;
+  }
+
+  const cleanColor = color.toLowerCase();
+  customColors.push(cleanColor);
+  saveCustomColorsToDB(); // Instant update to localStorage and rendering
+
+  // Automatically select the newly added color
+  const cardArea = document.getElementById('capture-card-area');
+  if (cardArea) {
+    cardArea.style.backgroundColor = cleanColor;
+  }
+
+  showToast('บันทึกสีกำหนดเองเรียบร้อย! ✨', 'success');
+  closeColorModal();
+
+  // Highlight the newly added color swatch
+  setTimeout(() => {
+    const swatches = document.querySelectorAll('.color-swatch');
+    swatches.forEach(s => s.classList.remove('scale-110', 'ring-4', 'ring-pencil/30'));
+    const newSwatch = Array.from(swatches).find(s => s.getAttribute('data-color') === cleanColor);
+    if (newSwatch) {
+      newSwatch.classList.add('scale-110', 'ring-4', 'ring-pencil/30');
+    }
+  }, 50);
+}
+
+function closeColorModal() {
+  document.getElementById('add-color-modal')?.classList.add('hidden');
+}
+
 function setupCustomizerEvents() {
   const cardArea = document.getElementById('capture-card-area');
   const patternOverlay = document.getElementById('paper-pattern-overlay');
   
-  // 1. Color Pickers
+  // Show plus button immediately so users can add custom colors without delay
+  const plusBtn = document.getElementById('btn-open-color-picker');
+  if (plusBtn) plusBtn.classList.remove('hidden');
+  
+  // 1. Preset Color Swatches click events
   const swatches = document.querySelectorAll('.color-swatch');
   swatches.forEach(swatch => {
     swatch.addEventListener('click', () => {
-      // Clear outline scale from other swatches
       swatches.forEach(s => s.classList.remove('scale-110', 'ring-4', 'ring-pencil/30'));
-      
-      // Apply active states
       swatch.classList.add('scale-110', 'ring-4', 'ring-pencil/30');
       
       const color = swatch.getAttribute('data-color');
@@ -74,14 +254,53 @@ function setupCustomizerEvents() {
     });
   });
   
-  // Trigger click on first swatch to initialize highlight
   if (swatches.length > 0) swatches[0].click();
+
+  // 1.5 Custom Colors UI & Modal Trigger setup
+  const colorModal = document.getElementById('add-color-modal');
+  const colorPicker = document.getElementById('user-color-picker');
+  const colorHex = document.getElementById('user-color-hex');
+  const openModalBtn = document.getElementById('btn-open-color-picker');
+  const closeModalX = document.getElementById('btn-close-color-modal-x');
+  const closeModalBtn = document.getElementById('btn-close-color-modal');
+  const addColorForm = document.getElementById('add-color-form');
+
+  // Trigger modal open
+  openModalBtn?.addEventListener('click', () => {
+    if (colorHex && colorPicker) {
+      colorPicker.value = '#FFFFFF';
+      colorHex.value = '#FFFFFF';
+    }
+    colorModal?.classList.remove('hidden');
+  });
+
+  // Modal closing events
+  closeModalX?.addEventListener('click', closeColorModal);
+  closeModalBtn?.addEventListener('click', closeColorModal);
+
+  // Sync Color picker input and Hex text input
+  colorPicker?.addEventListener('input', (e) => {
+    if (colorHex) colorHex.value = e.target.value.toUpperCase();
+  });
+  
+  colorHex?.addEventListener('input', (e) => {
+    let val = e.target.value.trim();
+    if (val && !val.startsWith('#')) {
+      val = '#' + val;
+      colorHex.value = val;
+    }
+    if (/^#[0-9A-F]{6}$/i.test(val)) {
+      if (colorPicker) colorPicker.value = val;
+    }
+  });
+
+  // Add Custom Color Submission
+  addColorForm?.addEventListener('submit', handleAddCustomColor);
 
   // 2. Pattern Selectors
   const patternBtns = document.querySelectorAll('.pattern-btn');
   patternBtns.forEach(btn => {
     btn.addEventListener('click', () => {
-      // Toggle button styles
       patternBtns.forEach(b => {
         b.classList.remove('btn-yellow');
         b.classList.add('btn-cream');
@@ -90,14 +309,19 @@ function setupCustomizerEvents() {
       btn.classList.remove('btn-cream');
       
       const pattern = btn.getAttribute('data-pattern');
+      const spiralRings = document.getElementById('paper-spiral-rings');
       
-      // Remove all patterns
       if (patternOverlay) {
-        patternOverlay.classList.remove('pattern-lined', 'pattern-grid', 'pattern-dotted');
+        patternOverlay.classList.remove('pattern-lined', 'pattern-grid', 'pattern-dotted', 'pattern-spiral');
+        cardArea?.classList.remove('pattern-spiral-pad');
+        if (spiralRings) spiralRings.classList.add('hidden');
         
-        // Add new pattern
         if (pattern !== 'plain') {
           patternOverlay.classList.add(`pattern-${pattern}`);
+          if (pattern === 'spiral') {
+            cardArea?.classList.add('pattern-spiral-pad');
+            if (spiralRings) spiralRings.classList.remove('hidden');
+          }
         }
       }
     });
@@ -125,7 +349,6 @@ function downloadCardAsPNG() {
   const originalShadow = cardArea.style.boxShadow;
   const originalTransform = cardArea.style.transform;
   
-  // Temporarily disable offset transformations / shadows for pristine canvas crop
   cardArea.style.boxShadow = 'none';
   cardArea.style.transform = 'none';
   
@@ -133,18 +356,19 @@ function downloadCardAsPNG() {
   
   setTimeout(() => {
     window.html2canvas(cardArea, {
-      scale: 3, // Premium quality scaling
+      scale: 3,
       backgroundColor: null,
       useCORS: true,
       allowTaint: true
     }).then(canvas => {
-      // Revert styling changes
       cardArea.style.boxShadow = originalShadow;
       cardArea.style.transform = originalTransform;
       
       try {
         const link = document.createElement('a');
-        link.download = `MyFestival-Card-${currentWishId || 'gift'}.png`;
+        const rawFestivalName = document.getElementById('card-festival-name')?.textContent || 'Festival';
+        const cleanFestivalName = rawFestivalName.replace('🏷️ ', '').trim();
+        link.download = `MyFestival-${cleanFestivalName}.png`;
         link.href = canvas.toDataURL('image/png');
         link.click();
         showToast('ดาวน์โหลดรูปภาพการ์ดอวยพรสำเร็จแล้ว! ✨', 'success');
@@ -158,7 +382,7 @@ function downloadCardAsPNG() {
       console.error('html2canvas error:', err);
       showToast('การสร้างการ์ดผิดพลาด: ' + err.message, 'error');
     });
-  }, 100); // Small timeout to allow styles to settle
+  }, 100);
 }
 
 export const cleanup = () => {
