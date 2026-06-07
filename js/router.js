@@ -166,9 +166,6 @@ document.addEventListener('DOMContentLoaded', async () => {
   // Initialize About System modal events
   initAboutModalEvents();
   
-  // Initialize Suggest Festival modal events
-  initSuggestModalEvents();
-  
   routePage(initialPath);
 });
 
@@ -325,7 +322,7 @@ function matchRoute(path) {
   if (path === '/register') {
     return { view: '/html/register.html', controller: '/js/auth.js', initName: 'initRegister', params: {} };
   }
-  if (['/archive', '/saved', '/profile', '/admin', '/contributor'].includes(path)) {
+  if (['/archive', '/saved', '/profile', '/admin', '/contributor', '/suggest'].includes(path)) {
     return { view: `/html${path}.html`, controller: `/js${path}.js`, params: {} };
   }
   
@@ -477,6 +474,9 @@ function checkAccessGuards(path) {
   }
   if (path === '/profile' && role === 'guest') {
     return '/login'; // Must login to view profile
+  }
+  if (path === '/suggest' && role === 'guest') {
+    return '/login'; // Must login to suggest festival
   }
   if (['/login', '/register'].includes(path) && role !== 'guest') {
     return '/'; // Redirect logged in user from login/register
@@ -668,222 +668,3 @@ function updateNavSelection(path) {
   });
 }
 
-// Global variables & handlers for Suggest Festival modal
-let suggestImageBase64 = null;
-
-function handleSuggestImageResize(file) {
-  return new Promise((resolve, reject) => {
-    const reader = new FileReader();
-    reader.onload = (event) => {
-      const img = new Image();
-      img.onload = () => {
-        const canvas = document.createElement('canvas');
-        canvas.width = 800;
-        canvas.height = 533;
-        const ctx = canvas.getContext('2d');
-        const targetWidth = 800;
-        const targetHeight = 533;
-        const sourceAspect = img.width / img.height;
-        const targetAspect = targetWidth / targetHeight;
-        
-        let srcX = 0, srcY = 0, srcWidth = img.width, srcHeight = img.height;
-        if (sourceAspect > targetAspect) {
-          srcWidth = img.height * targetAspect;
-          srcX = (img.width - srcWidth) / 2;
-        } else {
-          srcHeight = img.width / targetAspect;
-          srcY = (img.height - srcHeight) / 2;
-        }
-        
-        ctx.drawImage(img, srcX, srcY, srcWidth, srcHeight, 0, 0, targetWidth, targetHeight);
-        const dataUrl = canvas.toDataURL('image/jpeg', 0.85);
-        resolve(dataUrl);
-      };
-      img.onerror = () => reject(new Error('รูปภาพไม่ถูกต้อง'));
-      img.src = event.target.result;
-    };
-    reader.onerror = () => reject(new Error('ไม่สามารถอ่านไฟล์ภาพได้'));
-    reader.readAsDataURL(file);
-  });
-}
-
-function initSuggestModalEvents() {
-  const modal = document.getElementById('suggest-festival-modal');
-  const navSuggestBtn = document.getElementById('nav-suggest');
-  const btnClose = document.getElementById('btn-close-suggest');
-  const form = document.getElementById('suggest-festival-form');
-  const sigInput = document.getElementById('suggest-sig-input');
-  const anonCheckbox = document.getElementById('suggest-anonymous-checkbox');
-  const fileInput = document.getElementById('suggest-image-input');
-  const previewContainer = document.getElementById('suggest-image-preview-container');
-  const previewImg = document.getElementById('suggest-image-preview');
-  const btnRemoveImage = document.getElementById('btn-remove-suggest-image');
-  
-  const clearSuggestImage = () => {
-    suggestImageBase64 = null;
-    if (fileInput) fileInput.value = '';
-    if (previewContainer) previewContainer.classList.add('hidden');
-    if (previewImg) previewImg.src = '';
-  };
-  
-  navSuggestBtn?.addEventListener('click', (e) => {
-    e.preventDefault();
-    
-    // Check if user is guest
-    if (!currentSession.user || currentSession.role === 'guest') {
-      showToast('กรุณาสมัครบัญชี หรือเข้าสู่ระบบก่อนจึงจะเสนอเทศกาลได้', 'warning');
-      return;
-    }
-    
-    clearSuggestImage();
-    form?.reset();
-    
-    // Toggle first wish input field based on user role
-    const wishContainer = document.getElementById('suggest-wish-container');
-    const wishInput = document.getElementById('suggest-wish-input');
-    if (currentSession.role === 'member') {
-      if (wishContainer) wishContainer.classList.add('hidden');
-      if (wishInput) {
-        wishInput.required = false;
-        wishInput.value = '';
-      }
-    } else {
-      if (wishContainer) wishContainer.classList.remove('hidden');
-      if (wishInput) wishInput.required = true;
-    }
-    
-    // Pre-fill signature
-    if (sigInput && currentSession.profile) {
-      sigInput.readOnly = true;
-      sigInput.classList.add('bg-pencil-soft/20', 'cursor-not-allowed');
-      if (anonCheckbox && anonCheckbox.checked) {
-        sigInput.value = 'ผู้ไม่ประสงค์ออกนาม';
-      } else {
-        sigInput.value = currentSession.profile.full_name || 'ผู้เขียน';
-      }
-    }
-    
-    modal?.classList.remove('hidden');
-  });
-  
-  if (btnClose && modal) {
-    btnClose.addEventListener('click', () => {
-      modal.classList.add('hidden');
-      form?.reset();
-      clearSuggestImage();
-    });
-  }
-
-  fileInput?.addEventListener('change', async (e) => {
-    const file = e.target.files[0];
-    if (!file) return;
-    
-    try {
-      showToast('กำลังประมวลผลและบีบอัดรูปภาพ...', 'info');
-      const base64 = await handleSuggestImageResize(file);
-      suggestImageBase64 = base64;
-      
-      if (previewImg && previewContainer) {
-        previewImg.src = base64;
-        previewContainer.classList.remove('hidden');
-      }
-    } catch (err) {
-      console.error(err);
-      showToast('เกิดข้อผิดพลาดในการโหลดรูปภาพ: ' + err.message, 'error');
-      if (fileInput) fileInput.value = '';
-    }
-  });
-
-  btnRemoveImage?.addEventListener('click', () => {
-    clearSuggestImage();
-  });
-  
-  anonCheckbox?.addEventListener('change', () => {
-    if (anonCheckbox.checked) {
-      sigInput.value = 'ผู้ไม่ประสงค์ออกนาม';
-      sigInput.classList.add('text-gray-400');
-      sigInput.classList.remove('text-pencil');
-    } else {
-      sigInput.value = currentSession.profile?.full_name || 'ผู้เขียน';
-      sigInput.classList.remove('text-gray-400');
-      sigInput.classList.add('text-pencil');
-    }
-  });
-  
-  // Initialize Date Pickers for Festival Suggestions
-  if (document.getElementById('suggest-start-date')) {
-    flatpickr('#suggest-start-date', {
-      enableTime: false,
-      dateFormat: 'Y-m-d',
-      locale: 'th',
-      defaultDate: new Date()
-    });
-  }
-  if (document.getElementById('suggest-end-date')) {
-    flatpickr('#suggest-end-date', {
-      enableTime: false,
-      dateFormat: 'Y-m-d',
-      locale: 'th',
-      defaultDate: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000)
-    });
-  }
-  
-  form?.addEventListener('submit', async (e) => {
-    e.preventDefault();
-    const supabase = await getSupabase();
-    if (!supabase) return;
-    
-    const name = document.getElementById('suggest-name-input').value.trim();
-    const desc = document.getElementById('suggest-desc-input').value.trim();
-    let wish = document.getElementById('suggest-wish-input').value.trim();
-    if (!wish) {
-      wish = 'เสนอโดยสมาชิก (ไม่มีคำอวยพรเริ่มต้น)';
-    }
-    const sig = sigInput.value.trim();
-    const anonymous = anonCheckbox.checked;
-    const startDateVal = document.getElementById('suggest-start-date').value;
-    const endDateVal = document.getElementById('suggest-end-date').value;
-    
-    const submitBtn = form.querySelector('button[type="submit"]');
-    const origText = submitBtn.textContent;
-    submitBtn.disabled = true;
-    submitBtn.textContent = 'กำลังส่งข้อมูล... ⏳';
-    
-    try {
-      const { error } = await supabase
-        .from('festival_suggestions')
-        .insert({
-          name: name,
-          description: desc,
-          suggested_wish: wish,
-          signature: sig || null,
-          is_anonymous: anonymous,
-          suggested_by: currentSession.user?.id,
-          image_url: suggestImageBase64,
-          start_date: startDateVal ? new Date(startDateVal).toISOString() : null,
-          end_date: endDateVal ? new Date(endDateVal).toISOString() : null,
-          status: 'pending'
-        });
-        
-      if (error) throw error;
-      
-      // Log activity
-      await supabase.from('activity_logs').insert({
-        user_id: currentSession.user?.id,
-        action: 'suggest_festival',
-        details: { name: name }
-      });
-      
-      showToast('เสนอชื่อเทศกาลใหม่สำเร็จแล้ว! โปรดรอผู้ดูแลระบบพิจารณา 🎡', 'success');
-      modal?.classList.add('hidden');
-      form.reset();
-      clearSuggestImage();
-    } catch (error) {
-      console.error('Error suggesting festival:', error);
-      showToast('ไม่สามารถส่งข้อเสนอแนะได้: ' + error.message, 'error');
-    } finally {
-      submitBtn.disabled = false;
-      submitBtn.textContent = origText;
-    }
-  });
-}
