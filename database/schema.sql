@@ -160,6 +160,7 @@ create table if not exists about_info (
     id uuid primary key default gen_random_uuid(),
     title text not null,
     content text not null,
+    sort_order integer default 0,
     created_at timestamp with time zone default now() not null,
     updated_at timestamp with time zone default now() not null
 );
