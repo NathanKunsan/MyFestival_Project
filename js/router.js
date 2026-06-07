@@ -623,12 +623,8 @@ export async function refreshAuthUI() {
         navAdmin?.classList.add('hidden');
       }
 
-      // Hide suggest tab for admin, show for standard members and contributors
-      if (isAdmin) {
-        navSuggest?.classList.add('hidden');
-      } else {
-        navSuggest?.classList.remove('hidden');
-      }
+      // Show suggest tab for everyone
+      navSuggest?.classList.remove('hidden');
     } else {
       // Guest view
       navLogin?.classList.remove('hidden');
@@ -742,6 +738,20 @@ function initSuggestModalEvents() {
     clearSuggestImage();
     form?.reset();
     
+    // Toggle first wish input field based on user role
+    const wishContainer = document.getElementById('suggest-wish-container');
+    const wishInput = document.getElementById('suggest-wish-input');
+    if (currentSession.role === 'member') {
+      if (wishContainer) wishContainer.classList.add('hidden');
+      if (wishInput) {
+        wishInput.required = false;
+        wishInput.value = '';
+      }
+    } else {
+      if (wishContainer) wishContainer.classList.remove('hidden');
+      if (wishInput) wishInput.required = true;
+    }
+    
     // Pre-fill signature
     if (sigInput && currentSession.profile) {
       sigInput.readOnly = true;
@@ -825,7 +835,10 @@ function initSuggestModalEvents() {
     
     const name = document.getElementById('suggest-name-input').value.trim();
     const desc = document.getElementById('suggest-desc-input').value.trim();
-    const wish = document.getElementById('suggest-wish-input').value.trim();
+    let wish = document.getElementById('suggest-wish-input').value.trim();
+    if (!wish) {
+      wish = 'เสนอโดยสมาชิก (ไม่มีคำอวยพรเริ่มต้น)';
+    }
     const sig = sigInput.value.trim();
     const anonymous = anonCheckbox.checked;
     const startDateVal = document.getElementById('suggest-start-date').value;
