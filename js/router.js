@@ -369,11 +369,21 @@ function matchRoute(path) {
 }
 
 // Load and render page views
-async function routePage(path) {
+async function routePage(fullPath) {
   // Remove previous portaled modals from body (keep global #config-modal and #about-system-modal)
   const oldModals = document.body.querySelectorAll('[id$="-modal"]:not(#config-modal):not(#about-system-modal)');
   oldModals.forEach(m => m.remove());
   
+  // Parse path and query parameters
+  const [path, queryString] = fullPath.split('?');
+  const queryParams = {};
+  if (queryString) {
+    const searchParams = new URLSearchParams(queryString);
+    for (const [key, value] of searchParams.entries()) {
+      queryParams[key] = value;
+    }
+  }
+
   // If not configured, block navigation and display fallback
   if (!isConfigured()) {
     mainContent.innerHTML = `
@@ -393,6 +403,8 @@ async function routePage(path) {
   await refreshAuthUI();
 
   const matched = matchRoute(path);
+  // Merge parsed query parameters into matched params
+  matched.params = { ...matched.params, ...queryParams };
   
   // Guard admin and authenticated routes
   const accessDenied = checkAccessGuards(path);
