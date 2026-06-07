@@ -131,39 +131,37 @@
           </div>
         </div>
 
-      </div>
     </div>
-  </div>
 
-
-
-  <!-- Add Custom Color Modal -->
-  <div id="add-color-modal" class="hidden fixed inset-0 z-50 flex items-center justify-center bg-black/60 px-4">
-    <div class="sketch-card p-6 max-w-sm w-full bg-white relative">
-      <button id="btn-close-color-modal-x" class="absolute top-4 right-4 text-pencil hover:text-wood-red font-bold text-2xl" aria-label="Close modal">×</button>
-      
-      <h3 class="text-xl font-extrabold mb-4 pb-2 border-b-2 border-pencil text-center">🎨 ผสมสีกระดาษใหม่</h3>
-      
-      <form id="add-color-form" class="space-y-4">
-        <div class="flex flex-col items-center gap-3">
-          <label class="font-bold text-sm">เลือกสีหรือกรอกรหัสสี:</label>
-          <div class="flex items-center gap-4">
-            <input type="color" id="user-color-picker" class="w-16 h-16 rounded-full border-4 border-pencil cursor-pointer bg-transparent shadow-[3px_3px_0px_var(--color-pencil)]" value="#ffffff">
-            <div class="flex flex-col gap-1">
-              <label for="user-color-hex" class="font-bold text-xs text-pencil-light">รหัสสี HEX:</label>
-              <input type="text" id="user-color-hex" placeholder="#FFFFFF" class="sketch-input text-sm py-1 px-3 w-32 uppercase font-bold text-center" maxlength="7">
+    <!-- Add Custom Color Modal -->
+    <div id="add-color-modal" class="hidden fixed inset-0 z-50 flex items-center justify-center bg-black/60 px-4">
+      <div class="sketch-card p-6 max-w-sm w-full bg-white relative">
+        <button id="btn-close-color-modal-x" class="absolute top-4 right-4 text-pencil hover:text-wood-red font-bold text-2xl" aria-label="Close modal">×</button>
+        
+        <h3 id="color-modal-title" class="text-xl font-extrabold mb-4 pb-2 border-b-2 border-pencil text-center">🎨 ผสมสีกระดาษใหม่</h3>
+        
+        <form id="add-color-form" class="space-y-4">
+          <div class="flex flex-col items-center gap-3">
+            <label class="font-bold text-sm">เลือกสีหรือกรอกรหัสสี:</label>
+            <div class="flex items-center gap-4">
+              <input type="color" id="user-color-picker" class="w-16 h-16 rounded-full border-4 border-pencil cursor-pointer bg-transparent shadow-[3px_3px_0px_var(--color-pencil)]" value="#ffffff">
+              <div class="flex flex-col gap-1">
+                <label for="user-color-hex" class="font-bold text-xs text-pencil-light">รหัสสี HEX:</label>
+                <input type="text" id="user-color-hex" placeholder="#FFFFFF" class="sketch-input text-sm py-1 px-3 w-32 uppercase font-bold text-center" maxlength="7">
+              </div>
             </div>
           </div>
-        </div>
-        
-        <div class="sketch-divider"></div>
-        
-        <div class="flex justify-end gap-3">
-          <button type="button" id="btn-close-color-modal" class="sketch-btn btn-cream px-4 py-1.5 text-sm">ยกเลิก</button>
-          <button type="submit" class="sketch-btn btn-yellow px-5 py-1.5 text-sm font-bold">บันทึกสีนี้ 💾</button>
-        </div>
-      </form>
+          
+          <div class="sketch-divider"></div>
+          
+          <div class="flex justify-end gap-3">
+            <button type="button" id="btn-close-color-modal" class="sketch-btn btn-cream px-4 py-1.5 text-sm">ยกเลิก</button>
+            <button type="submit" id="btn-submit-color" class="sketch-btn btn-yellow px-5 py-1.5 text-sm font-bold">บันทึกสีนี้ 💾</button>
+          </div>
+        </form>
+      </div>
     </div>
+
   </div>
 
 </body>
