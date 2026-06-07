@@ -82,6 +82,12 @@
         
         <!-- User Info / Actions -->
         <div id="nav-auth-group" class="flex flex-col lg:flex-row items-stretch lg:items-center gap-2 border-t-2 lg:border-t-0 lg:border-l-2 border-pencil/30 pt-2 lg:pt-0 pl-0 lg:pl-4">
+          <!-- Bell Notification Icon -->
+          <a href="/profile" id="nav-notifications" class="hidden px-3 py-1.5 rounded-lg hover:bg-wood-yellow/30 transition duration-150 flex items-center gap-2 relative">
+            <span id="nav-bell-icon" class="inline-block text-xl select-none transition-transform duration-300">🔔</span>
+            <span class="lg:hidden">การแจ้งเตือน</span>
+            <span id="bell-notif-badge" class="hidden bg-wood-red border-2 border-pencil text-pencil text-[10px] font-black w-5 h-5 rounded-full flex items-center justify-center shadow-[1px_1px_0px_0px_#4a3c31]">0</span>
+          </a>
           <a href="/profile" id="nav-profile" class="hidden px-3 py-1.5 rounded-lg hover:bg-wood-yellow/30 transition duration-150 flex items-center gap-2">
             <img id="nav-avatar" class="w-8 h-8 rounded-full border-2 border-pencil" src="" alt="avatar" onerror="this.src='https://api.dicebear.com/7.x/fun-emoji/svg?seed=guest'">
             <span id="nav-username">โปรไฟล์</span>
