@@ -427,7 +427,7 @@ async function routePage(fullPath) {
   // Render view template
   try {
     if (matched.view) {
-      const response = await fetch(matched.view);
+      const response = await fetch(`${matched.view}?v=${new Date().getTime()}`);
       if (!response.ok) throw new Error('Failed to load view');
       let html = await response.text();
       
