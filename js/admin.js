@@ -2604,6 +2604,10 @@ function openDeleteReasonModal(id) {
   document.getElementById('delete-reason-modal').classList.remove('hidden');
 }
 
+// Keep track of loaded news items in memory for drag-and-drop / sorting
+let loadedAboutItems = [];
+let draggedItem = null;
+
 // About Info Management CRUD implementation
 async function loadAboutTab() {
   const supabase = await getSupabase();
@@ -2613,19 +2617,28 @@ async function loadAboutTab() {
   listContainer.innerHTML = `<p class="text-pencil-light font-bold italic text-center py-6">กำลังโหลดข้อมูลข่าวสาร... ⏳</p>`;
   
   try {
-    const { data, error } = await supabase
+    let result = await supabase
       .from('about_info')
       .select('*')
-      .order('created_at', { ascending: false });
+      .order('sort_order', { ascending: true });
       
-    if (error) throw error;
+    if (result.error && result.error.message.includes('sort_order')) {
+      // Fallback if column doesn't exist yet
+      result = await supabase
+        .from('about_info')
+        .select('*')
+        .order('created_at', { ascending: true });
+    }
     
-    renderAdminAboutList(data || []);
+    if (result.error) throw result.error;
+    
+    loadedAboutItems = result.data || [];
+    renderAdminAboutList(loadedAboutItems);
+    setupAboutListEvents(loadedAboutItems);
   } catch (error) {
     console.error('Error fetching about info:', error);
     listContainer.innerHTML = `<p class="text-wood-red font-bold text-center">ไม่สามารถโหลดข้อมูลข่าวสารได้: ${error.message}</p>`;
   }
-  setupAboutListEvents();
 }
 
 function renderAdminAboutList(items) {
@@ -2637,18 +2650,36 @@ function renderAdminAboutList(items) {
     return;
   }
   
-  container.innerHTML = items.map(item => `
-    <div class="sketch-card p-4 bg-white flex justify-between items-start gap-4 shadow-[2px_2px_0px_0px_#4a3c31]">
-      <div class="space-y-1">
-        <h3 class="font-extrabold text-base">📢 ${item.title}</h3>
-        <p class="text-xs whitespace-pre-wrap font-bold text-pencil-light leading-relaxed">${item.content}</p>
-        <p class="text-[9px] text-pencil-light/60 mt-1 italic">อัปเดตล่าสุด: ${new Date(item.updated_at).toLocaleString('th-TH')}</p>
+  container.innerHTML = items.map((item, index) => `
+    <div class="sketch-card p-4 bg-white flex justify-between items-start gap-4 shadow-[2px_2px_0px_0px_#4a3c31] draggable-about-item cursor-default" 
+         draggable="true" data-id="${item.id}" data-index="${index}">
+      <div class="flex items-start gap-3 w-full">
+        <!-- Drag Handle Icon -->
+        <div class="cursor-grab text-pencil-light/40 hover:text-pencil font-black text-xl select-none pt-1 flex flex-col gap-0.5" title="ลากเพื่อเปลี่ยนลำดับ (Drag & Drop)">
+          <span>⋮</span>
+          <span>⋮</span>
+        </div>
+        <div class="space-y-1 flex-grow">
+          <h3 class="font-extrabold text-base">📢 ${item.title}</h3>
+          <p class="text-xs whitespace-pre-wrap font-bold text-pencil-light leading-relaxed">${item.content}</p>
+          <p class="text-[9px] text-pencil-light/60 mt-1 italic">อัปเดตล่าสุด: ${new Date(item.updated_at).toLocaleString('th-TH')}</p>
+        </div>
       </div>
-      <div class="flex flex-col gap-2 shrink-0">
-        <button class="sketch-btn btn-cream text-xs py-1 px-3 btn-edit-about font-bold" data-id="${item.id}">
+      <div class="flex flex-col gap-1.5 shrink-0">
+        <div class="flex gap-1">
+          <!-- Move Up Button -->
+          <button type="button" class="sketch-btn btn-cream text-[10px] py-1 px-2.5 btn-move-up-about font-bold" data-id="${item.id}" data-index="${index}" ${index === 0 ? 'disabled style="opacity: 0.4; cursor: not-allowed;"' : ''}>
+            ▲
+          </button>
+          <!-- Move Down Button -->
+          <button type="button" class="sketch-btn btn-cream text-[10px] py-1 px-2.5 btn-move-down-about font-bold" data-id="${item.id}" data-index="${index}" ${index === items.length - 1 ? 'disabled style="opacity: 0.4; cursor: not-allowed;"' : ''}>
+            ▼
+          </button>
+        </div>
+        <button type="button" class="sketch-btn btn-cream text-xs py-1 px-3 btn-edit-about font-bold" data-id="${item.id}">
           แก้ไข ✏️
         </button>
-        <button class="sketch-btn btn-red text-xs py-1 px-3 btn-delete-about font-bold" data-id="${item.id}">
+        <button type="button" class="sketch-btn btn-red text-xs py-1 px-3 btn-delete-about font-bold" data-id="${item.id}">
           ลบ 🗑️
         </button>
       </div>
@@ -2656,9 +2687,11 @@ function renderAdminAboutList(items) {
   `).join('');
 }
 
-function setupAboutListEvents() {
+function setupAboutListEvents(items) {
   const editBtns = document.querySelectorAll('.btn-edit-about');
   const deleteBtns = document.querySelectorAll('.btn-delete-about');
+  const moveUpBtns = document.querySelectorAll('.btn-move-up-about');
+  const moveDownBtns = document.querySelectorAll('.btn-move-down-about');
   
   editBtns.forEach(btn => {
     btn.addEventListener('click', async () => {
@@ -2673,6 +2706,124 @@ function setupAboutListEvents() {
       await handleDeleteAbout(id);
     });
   });
+  
+  moveUpBtns.forEach(btn => {
+    btn.addEventListener('click', async () => {
+      const index = parseInt(btn.getAttribute('data-index'), 10);
+      await moveAboutItem(items, index, 'up');
+    });
+  });
+  
+  moveDownBtns.forEach(btn => {
+    btn.addEventListener('click', async () => {
+      const index = parseInt(btn.getAttribute('data-index'), 10);
+      await moveAboutItem(items, index, 'down');
+    });
+  });
+  
+  // Setup drag and drop
+  const container = document.getElementById('admin-about-list');
+  if (container) {
+    setupAboutDragAndDrop(container, items);
+  }
+}
+
+async function moveAboutItem(items, index, direction) {
+  const newIndex = direction === 'up' ? index - 1 : index + 1;
+  if (newIndex < 0 || newIndex >= items.length) return;
+  
+  // Swap items
+  const temp = items[index];
+  items[index] = items[newIndex];
+  items[newIndex] = temp;
+  
+  // Re-render and save
+  renderAdminAboutList(items);
+  setupAboutListEvents(items);
+  
+  const orderedIds = items.map(i => i.id);
+  await updateAboutOrder(orderedIds);
+}
+
+function setupAboutDragAndDrop(container, items) {
+  const draggableItems = container.querySelectorAll('.draggable-about-item');
+  
+  draggableItems.forEach(item => {
+    item.addEventListener('dragstart', (e) => {
+      draggedItem = item;
+      item.classList.add('opacity-40');
+      e.dataTransfer.effectAllowed = 'move';
+    });
+    
+    item.addEventListener('dragend', () => {
+      draggedItem = null;
+      item.classList.remove('opacity-40');
+      draggableItems.forEach(i => i.classList.remove('bg-wood-yellow/10', 'border-dashed'));
+    });
+    
+    item.addEventListener('dragover', (e) => {
+      e.preventDefault();
+      e.dataTransfer.dropEffect = 'move';
+      
+      if (item !== draggedItem) {
+        item.classList.add('bg-wood-yellow/10', 'border-dashed');
+      }
+    });
+    
+    item.addEventListener('dragleave', () => {
+      item.classList.remove('bg-wood-yellow/10', 'border-dashed');
+    });
+    
+    item.addEventListener('drop', async (e) => {
+      e.preventDefault();
+      item.classList.remove('bg-wood-yellow/10', 'border-dashed');
+      
+      if (draggedItem && draggedItem !== item) {
+        const draggedId = draggedItem.getAttribute('data-id');
+        const targetId = item.getAttribute('data-id');
+        
+        const draggedIndex = items.findIndex(i => i.id === draggedId);
+        const targetIndex = items.findIndex(i => i.id === targetId);
+        
+        if (draggedIndex !== -1 && targetIndex !== -1) {
+          const [removed] = items.splice(draggedIndex, 1);
+          items.splice(targetIndex, 0, removed);
+          
+          renderAdminAboutList(items);
+          setupAboutListEvents(items);
+          
+          const orderedIds = items.map(i => i.id);
+          await updateAboutOrder(orderedIds);
+        }
+      }
+    });
+  });
+}
+
+async function updateAboutOrder(orderedIds) {
+  const supabase = await getSupabase();
+  try {
+    const updates = orderedIds.map((id, index) => {
+      return supabase
+        .from('about_info')
+        .update({ sort_order: index })
+        .eq('id', id);
+    });
+    
+    const results = await Promise.all(updates);
+    const hasError = results.some(res => res.error);
+    
+    if (hasError) {
+      console.warn("Could not save sort order, likely because the sort_order column does not exist in about_info yet.");
+      showToast('เรียงลำดับในหน้าจอเสร็จสิ้น แต่ไม่สามารถบันทึกลำดับไปยังฐานข้อมูลได้เนื่องจากขาดคอลัมน์ sort_order (กรุณาให้ผู้ดูแลระบบรัน SQL Alter Table)', 'warning');
+      return;
+    }
+    
+    showToast('จัดลำดับข้อมูลข่าวสารสำเร็จแล้ว! ✨', 'success');
+  } catch (err) {
+    console.error('Error updating order:', err);
+    showToast('เกิดข้อผิดพลาดในการจัดลำดับ: ' + err.message, 'error');
+  }
 }
 
 async function enterEditAboutMode(id) {
@@ -2765,10 +2916,21 @@ function setupAboutForm() {
         showToast('แก้ไขข้อมูลเรียบร้อยแล้ว!', 'success');
       } else {
         // Insert
-        const { error } = await supabase
+        const newSortOrder = loadedAboutItems.length;
+        const insertData = { title, content, sort_order: newSortOrder };
+        
+        let { error } = await supabase
           .from('about_info')
-          .insert({ title, content });
+          .insert(insertData);
           
+        if (error && error.message.includes('sort_order')) {
+          // Fallback if sort_order column doesn't exist
+          const { error: fallbackErr } = await supabase
+            .from('about_info')
+            .insert({ title, content });
+          error = fallbackErr;
+        }
+        
         if (error) throw error;
         showToast('เพิ่มข้อมูลใหม่เรียบร้อยแล้ว!', 'success');
       }
