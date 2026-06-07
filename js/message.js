@@ -430,6 +430,14 @@ function setupInteractiveEvents() {
   // 3. Download Card as PNG Image
   document.getElementById('btn-download-card')?.addEventListener('click', () => {
     if (!currentMessage) return;
+    try {
+      sessionStorage.setItem('active_wish_download', JSON.stringify({
+        ...currentMessage,
+        festival_name: currentFestival?.name || 'เทศกาล'
+      }));
+    } catch (e) {
+      console.warn('Error saving message details to sessionStorage:', e);
+    }
     navigate(`/download-card?wishId=${currentMessage.id}`);
   });
   
