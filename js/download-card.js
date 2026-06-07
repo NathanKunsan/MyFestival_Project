@@ -9,6 +9,24 @@ let currentUser = null;
 let customColors = [];
 let editingColorIndex = null;
 
+// Custom color coordinates slot layout mapped to the wooden palette curve (lower half)
+const customColorSlots = [
+  { left: '81%', top: '63%' }, // Custom 1
+  { left: '72%', top: '76%' }, // Custom 2
+  { left: '58%', top: '82%' }, // Custom 3
+  { left: '44%', top: '81%' }, // Custom 4
+  { left: '30%', top: '54%' }  // Custom 5 (above the bottom-left thumb hole)
+];
+
+// Plus (+) button position shifts dynamically depending on custom color count
+const getPlusButtonPosition = () => {
+  const count = customColors.length;
+  if (count < customColorSlots.length) {
+    return customColorSlots[count];
+  }
+  return { left: '30%', top: '54%' }; // fallback
+};
+
 // Initialize Card Downloader Page
 export const init = async () => {
   const urlParams = new URLSearchParams(window.location.hash.includes('?') ? window.location.hash.split('?')[1] : '');
@@ -187,31 +205,57 @@ async function loadCustomColors(supabase) {
   renderCustomColors();
 }
 
+function selectColor(color) {
+  // Update card background color
+  const cardArea = document.getElementById('capture-card-area');
+  if (cardArea) {
+    cardArea.style.backgroundColor = color;
+  }
+
+  // Update brush tip paint color
+  const brushTip = document.getElementById('brush-tip-paint');
+  if (brushTip) {
+    brushTip.style.fill = color;
+  }
+
+  // Update center preview bubble color
+  const centerPreviewInner = document.getElementById('palette-center-preview-inner');
+  if (centerPreviewInner) {
+    centerPreviewInner.style.backgroundColor = color;
+  }
+}
+
 function renderCustomColors() {
   const list = document.getElementById('user-colors-list');
   if (!list) return;
 
-  list.innerHTML = customColors.map((color, index) => `
-    <div class="relative group inline-block">
-      <button type="button" class="color-swatch custom-swatch w-10 h-10 rounded-full border-2 border-pencil focus:scale-110 shadow-[2px_2px_0px_var(--color-pencil)] active:translate-x-[1px] active:translate-y-[1px] active:shadow-none transition-all" 
-              style="background-color: ${color};" data-color="${color}"></button>
-      <button type="button" class="btn-edit-color absolute -top-1 -left-1 bg-wood-yellow border border-pencil text-[9px] font-black w-4 h-4 rounded-full flex items-center justify-center shadow-[1px_1px_0px_0px_#4a3c31] hover:scale-110 active:scale-95" data-index="${index}" title="แก้ไขสี">✎</button>
-      <button type="button" class="btn-delete-color absolute -top-1 -right-1 bg-wood-red border border-pencil text-[9px] font-black w-4 h-4 rounded-full flex items-center justify-center shadow-[1px_1px_0px_0px_#4a3c31] hover:scale-110 active:scale-95" data-index="${index}" title="ลบสี">×</button>
-    </div>
-  `).join('');
+  list.innerHTML = customColors.map((color, index) => {
+    const slot = customColorSlots[index] || { left: '0px', top: '0px' };
+    return `
+      <div class="absolute group" style="left: ${slot.left}; top: ${slot.top}; transform: translate(-50%, -50%);">
+        <button type="button" class="color-swatch custom-swatch w-8 h-8 rounded-full border-2 border-pencil focus:scale-110 shadow-[1.5px_1.5px_0px_var(--color-pencil)] active:translate-x-[0.5px] active:translate-y-[0.5px] active:shadow-none transition-all" 
+                style="background-color: ${color};" data-color="${color}"></button>
+        <button type="button" class="btn-edit-color absolute -top-1 -left-1 bg-wood-yellow border border-pencil text-[9px] font-black w-4 h-4 rounded-full flex items-center justify-center shadow-[1px_1px_0px_0px_#4a3c31] hover:scale-110 active:scale-95 transition-all" data-index="${index}" title="แก้ไขสี">✎</button>
+        <button type="button" class="btn-delete-color absolute -top-1 -right-1 bg-wood-red border border-pencil text-[9px] font-black w-4 h-4 rounded-full flex items-center justify-center shadow-[1px_1px_0px_0px_#4a3c31] hover:scale-110 active:scale-95 transition-all" data-index="${index}" title="ลบสี">×</button>
+      </div>
+    `;
+  }).join('');
 
-  // Manage plus button visibility based on color count limit
+  // Position and display plus button dynamically
   const plusBtn = document.getElementById('btn-open-color-picker');
   if (plusBtn) {
     if (customColors.length >= 5) {
       plusBtn.classList.add('hidden');
     } else {
       plusBtn.classList.remove('hidden');
+      const slot = getPlusButtonPosition();
+      plusBtn.style.left = slot.left;
+      plusBtn.style.top = slot.top;
+      plusBtn.style.transform = 'translate(-50%, -50%)';
     }
   }
 
   // Setup click triggers on all color swatches (preset & custom)
-  const cardArea = document.getElementById('capture-card-area');
   const swatches = document.querySelectorAll('.color-swatch');
   
   document.querySelectorAll('.custom-swatch').forEach(swatch => {
@@ -219,9 +263,7 @@ function renderCustomColors() {
       swatches.forEach(s => s.classList.remove('scale-110', 'ring-4', 'ring-pencil/30'));
       swatch.classList.add('scale-110', 'ring-4', 'ring-pencil/30');
       const color = swatch.getAttribute('data-color');
-      if (cardArea) {
-        cardArea.style.backgroundColor = color;
-      }
+      selectColor(color);
     });
   });
 
@@ -307,11 +349,7 @@ async function handleAddCustomColor(e) {
     customColors[editingColorIndex] = cleanColor;
     saveCustomColorsToDB();
 
-    const cardArea = document.getElementById('capture-card-area');
-    if (cardArea) {
-      cardArea.style.backgroundColor = cleanColor;
-    }
-
+    selectColor(cleanColor);
     showToast('แก้ไขสีกระดาษเรียบร้อย! ✨', 'success');
     closeColorModal();
 
@@ -338,12 +376,7 @@ async function handleAddCustomColor(e) {
     customColors.push(cleanColor);
     saveCustomColorsToDB(); // Instant update to localStorage and rendering
 
-    // Automatically select the newly added color
-    const cardArea = document.getElementById('capture-card-area');
-    if (cardArea) {
-      cardArea.style.backgroundColor = cleanColor;
-    }
-
+    selectColor(cleanColor);
     showToast('บันทึกสีกำหนดเองเรียบร้อย! ✨', 'success');
     closeColorModal();
 
@@ -379,9 +412,7 @@ function setupCustomizerEvents() {
       swatch.classList.add('scale-110', 'ring-4', 'ring-pencil/30');
       
       const color = swatch.getAttribute('data-color');
-      if (cardArea) {
-        cardArea.style.backgroundColor = color;
-      }
+      selectColor(color);
     });
   });
   
