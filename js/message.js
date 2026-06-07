@@ -20,16 +20,16 @@ export const init = async (params) => {
     navigate('/');
     return;
   }
-  
+
   const supabase = await getSupabase();
   if (!supabase) return;
-  
+
   const user = await getCurrentUser();
   currentUserId = user ? user.id : null;
-  
+
   // Set up elements
   setupInteractiveEvents();
-  
+
   // Detect if parameter ID is a Festival or a Message
   try {
     const { data: festival } = await supabase
@@ -37,7 +37,7 @@ export const init = async (params) => {
       .select('*')
       .eq('id', id)
       .maybeSingle();
-      
+
     if (festival) {
       currentFestival = festival;
       const now = new Date();
@@ -66,19 +66,19 @@ export const init = async (params) => {
 // Fetch a specific message by ID
 async function loadSpecificMessage(messageId) {
   const supabase = await getSupabase();
-  
+
   try {
     const { data: message, error } = await supabase
       .from('messages')
       .select('*, festivals(*)')
       .eq('id', messageId)
       .maybeSingle();
-      
+
     if (error || !message) {
       renderErrorState('ไม่พบคำอวยพรที่คุณค้นหา หรือข้อความนี้อาจกำลังรอการตรวจสอบ');
       return;
     }
-    
+
     // Check if the message is approved. If not, only contributor or admin can view
     if (message.status !== 'approved' && message.contributor_id !== currentUserId) {
       // Check if admin
@@ -88,10 +88,10 @@ async function loadSpecificMessage(messageId) {
         return;
       }
     }
-    
+
     currentMessage = message;
     currentFestival = message.festivals;
-    
+
     if (currentFestival) {
       const now = new Date();
       const startDate = new Date(currentFestival.start_date);
@@ -100,7 +100,7 @@ async function loadSpecificMessage(messageId) {
         return;
       }
     }
-    
+
     document.getElementById('festival-title').textContent = `🎈 ${currentFestival.name}`;
     await renderMessageCard();
   } catch (error) {
@@ -112,7 +112,7 @@ async function loadSpecificMessage(messageId) {
 // Draw a random message for a festival (Handles duplicate prevention)
 async function drawRandomMessage(festivalId) {
   const supabase = await getSupabase();
-  
+
   try {
     // 1. Get all approved messages for this festival
     const { data: allMessages, error: msgError } = await supabase
@@ -120,14 +120,14 @@ async function drawRandomMessage(festivalId) {
       .select('*')
       .eq('festival_id', festivalId)
       .eq('status', 'approved');
-      
+
     if (msgError) throw msgError;
-    
+
     if (!allMessages || allMessages.length === 0) {
       renderEmptyState();
       return;
     }
-    
+
     // Filter messages based on tags input
     const tagFilter = document.getElementById('tag-filter-input')?.value.trim().toLowerCase() || '';
     let filteredMessages = allMessages;
@@ -137,16 +137,16 @@ async function drawRandomMessage(festivalId) {
         const msgTags = m.tags.toLowerCase().split(',').map(t => t.trim());
         return msgTags.some(tag => tag.includes(tagFilter) || tagFilter.includes(tag));
       });
-      
+
       if (filteredMessages.length === 0) {
         showToast('ไม่พบคำอวยพรที่ตรงกับแท็กนี้ครับ 🍂', 'warning');
         renderEmptyState();
         return;
       }
     }
-    
+
     let targetMessage = null;
-    
+
     // 2. If User is Logged In (Member / Contributor / Admin) - Avoid duplicates
     if (currentUserId) {
       // Get random history for this user & festival
@@ -155,18 +155,18 @@ async function drawRandomMessage(festivalId) {
         .select('message_id')
         .eq('user_id', currentUserId)
         .eq('festival_id', festivalId);
-        
+
       if (histError) throw histError;
-      
+
       const seenIds = new Set((history || []).map(h => h.message_id));
-      
+
       // Filter out seen messages from filtered pool
       const pool = filteredMessages.filter(m => !seenIds.has(m.id));
-      
+
       if (pool.length > 0) {
         // Pick from pool
         targetMessage = pool[Math.floor(Math.random() * pool.length)];
-        
+
         // Save to history
         await supabase.from('random_history').insert({
           user_id: currentUserId,
@@ -180,12 +180,12 @@ async function drawRandomMessage(festivalId) {
           .delete()
           .eq('user_id', currentUserId)
           .eq('festival_id', festivalId);
-          
+
         showToast('คุณได้อ่านคำอวยพรครบทุกข้อความตามแท็กนี้แล้ว! ระบบกำลังรีเซ็ตเริ่มสุ่มรอบใหม่ให้ครับ', 'info');
-        
+
         // Pick from full filtered list and log as the first of the new cycle
         targetMessage = filteredMessages[Math.floor(Math.random() * filteredMessages.length)];
-        
+
         await supabase.from('random_history').insert({
           user_id: currentUserId,
           festival_id: festivalId,
@@ -196,12 +196,12 @@ async function drawRandomMessage(festivalId) {
       // 3. Guest User: Draw completely at random from filtered list
       targetMessage = filteredMessages[Math.floor(Math.random() * filteredMessages.length)];
     }
-    
+
     currentMessage = targetMessage;
-    
+
     // Replace URL in address bar to represent the actual message ID for sharing, without reload
     window.history.replaceState({}, '', `/#/message/${currentMessage.id}`);
-    
+
     await renderMessageCard();
   } catch (error) {
     console.error('Error drawing random message:', error);
@@ -214,10 +214,10 @@ async function renderMessageCard() {
   const container = document.getElementById('message-container');
   const controls = document.getElementById('message-controls');
   if (!container || !currentMessage) return;
-  
+
   // Show controller buttons
   controls.classList.remove('hidden');
-  
+
   const drawRandomBtn = document.getElementById('btn-draw-random');
   if (drawRandomBtn) {
     if (currentFestival && new Date(currentFestival.end_date) < new Date()) {
@@ -226,16 +226,16 @@ async function renderMessageCard() {
       drawRandomBtn.classList.remove('hidden');
     }
   }
-  
+
   // Load interaction metrics
   const likesCount = await getLikesCount(currentMessage.id);
   const isLiked = currentUserId ? await checkUserLike(currentMessage.id, currentUserId) : false;
   const isSaved = currentUserId ? await checkUserSave(currentMessage.id, currentUserId) : false;
-  
-  const signature = currentMessage.is_anonymous || !currentMessage.signature 
-    ? 'ผู้ปรารถนาดี' 
+
+  const signature = currentMessage.is_anonymous || !currentMessage.signature
+    ? 'ผู้ปรารถนาดี'
     : currentMessage.signature;
-    
+
   container.innerHTML = `
     <div class="sketch-card p-8 md:p-12 bg-white relative notebook-lines shadow-[6px_6px_0px_0px_#4a3c31] transition-all hover:rotate-[0.5deg]">
       
@@ -248,18 +248,18 @@ async function renderMessageCard() {
             "${currentMessage.message_text}"
           </p>
           ${(() => {
-            if (currentMessage.tags) {
-              const tagList = currentMessage.tags.split(',').map(t => t.trim()).filter(Boolean);
-              if (tagList.length > 0) {
-                return `
+      if (currentMessage.tags) {
+        const tagList = currentMessage.tags.split(',').map(t => t.trim()).filter(Boolean);
+        if (tagList.length > 0) {
+          return `
                   <div class="flex flex-wrap gap-1.5 justify-center mt-4">
                     ${tagList.map(t => `<span class="sketch-badge btn-cream text-[10px] font-bold py-0.5 px-2">#${t}</span>`).join('')}
                   </div>
                 `;
-              }
-            }
-            return '';
-          })()}
+        }
+      }
+      return '';
+    })()}
         </div>
         
         <!-- Signature & Footer actions -->
@@ -294,7 +294,7 @@ async function renderMessageCard() {
       
     </div>
   `;
-  
+
   // Attach event handlers to card interactions
   document.getElementById('btn-like-msg')?.addEventListener('click', handleLikeToggle);
   document.getElementById('btn-save-msg')?.addEventListener('click', handleSaveToggle);
@@ -324,15 +324,15 @@ async function handleLikeToggle() {
     setTimeout(() => navigate('/login'), 1500);
     return;
   }
-  
+
   if (isLikePending) return;
   isLikePending = true;
-  
+
   try {
     const isNowLiked = await toggleLike(currentMessage.id, currentUserId);
     const likeBtn = document.getElementById('btn-like-msg');
     const likeCountSpan = document.getElementById('like-count');
-    
+
     if (likeBtn && likeCountSpan) {
       let count = parseInt(likeCountSpan.textContent) || 0;
       if (isNowLiked) {
@@ -365,14 +365,14 @@ async function handleSaveToggle() {
     setTimeout(() => navigate('/login'), 1500);
     return;
   }
-  
+
   if (isSavePending) return;
   isSavePending = true;
-  
+
   try {
     const isNowSaved = await toggleSave(currentMessage.id, currentUserId);
     const saveBtn = document.getElementById('btn-save-msg');
-    
+
     if (saveBtn) {
       if (isNowSaved) {
         saveBtn.classList.remove('btn-cream');
@@ -410,13 +410,13 @@ function setupInteractiveEvents() {
       await drawRandomMessage(currentFestival.id);
     }
   });
-  
+
   // 2. Copy Share Link
   document.getElementById('btn-copy-link')?.addEventListener('click', async () => {
     if (!currentMessage) return;
-    
+
     const shareUrl = `${window.location.origin}/#/message/${currentMessage.id}`;
-    
+
     try {
       await navigator.clipboard.writeText(shareUrl);
       showToast('คัดลอกลิงก์แชร์ใส่คลิปบอร์ดแล้ว! ส่งต่อให้เพื่อนได้เลย', 'success');
@@ -426,7 +426,7 @@ function setupInteractiveEvents() {
       showToast('ไม่สามารถคัดลอกลิงก์ได้อัตโนมัติ ลิงก์ของคุณคือ: ' + shareUrl, 'warning');
     }
   });
-  
+
   // 3. Download Card as PNG Image
   document.getElementById('btn-download-card')?.addEventListener('click', () => {
     if (!currentMessage) return;
@@ -440,25 +440,25 @@ function setupInteractiveEvents() {
     }
     navigate(`/download-card?wishId=${currentMessage.id}`);
   });
-  
+
   // 4. Close Report Modal
   document.getElementById('btn-close-report')?.addEventListener('click', () => {
     document.getElementById('report-modal')?.classList.add('hidden');
   });
-  
+
   // 5. Submit Report Form
   const reportForm = document.getElementById('report-form');
   reportForm?.addEventListener('submit', async (e) => {
     e.preventDefault();
     if (!currentMessage) return;
-    
+
     const reason = document.getElementById('report-reason').value.trim();
     const submitBtn = reportForm.querySelector('button[type="submit"]');
     const origText = submitBtn.textContent;
-    
+
     submitBtn.disabled = true;
     submitBtn.textContent = 'กำลังส่ง...';
-    
+
     try {
       await submitReport(currentMessage.id, currentUserId, reason);
       showToast('ส่งรายงานความไม่เหมาะสมให้ผู้ดูแลระบบตรวจสอบแล้ว ขอบคุณครับ', 'success');
@@ -475,7 +475,7 @@ function setupInteractiveEvents() {
   // 6. Admin Delete Post
   document.getElementById('btn-delete-post')?.addEventListener('click', async () => {
     if (!currentMessage) return;
-    
+
     if (!confirm('คุณแน่ใจหรือไม่ว่าต้องการลบโพสต์คำอวยพรนี้ออกจากระบบ? ข้อมูลการถูกใจ การบันทึก และการรายงานทั้งหมดที่เกี่ยวข้องจะถูกลบออกด้วย')) {
       return;
     }
