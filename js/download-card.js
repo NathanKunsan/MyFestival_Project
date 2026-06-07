@@ -7,6 +7,7 @@ let currentFestivalId = null;
 let currentWishId = null;
 let currentUser = null;
 let customColors = [];
+let editingColorIndex = null;
 
 // Initialize Card Downloader Page
 export const init = async () => {
@@ -23,6 +24,9 @@ export const init = async () => {
   
   // Set up interactive customizer events immediately so UI is responsive
   setupCustomizerEvents();
+
+  // Try rendering synchronously from cache before making the API request
+  tryRenderFromCache(wishId);
 
   // Load database details asynchronously in the background
   getSupabase().then(async (supabase) => {
@@ -48,11 +52,78 @@ export const init = async () => {
   });
 };
 
+function tryRenderFromCache(wishId) {
+  // 1. Check sessionStorage
+  const activeWishStr = sessionStorage.getItem('active_wish_download');
+  if (activeWishStr) {
+    try {
+      const wish = JSON.parse(activeWishStr);
+      if (wish && (wish.id === wishId || String(wish.id) === String(wishId))) {
+        renderWishData(wish);
+        return;
+      }
+    } catch (e) {
+      console.warn('Error parsing active_wish_download:', e);
+    }
+  }
+
+  // 2. Check myfestival_mock_wishes
+  const mockWishesStr = localStorage.getItem('myfestival_mock_wishes');
+  if (mockWishesStr) {
+    try {
+      const wishes = JSON.parse(mockWishesStr);
+      const wish = wishes.find(w => w.id === wishId || String(w.id) === String(wishId));
+      if (wish) {
+        renderWishData(wish);
+        return;
+      }
+    } catch (e) {
+      console.warn('Error parsing mock wishes:', e);
+    }
+  }
+
+  // 3. Check myfestival_admin_saved_messages
+  const savedWishesStr = localStorage.getItem('myfestival_admin_saved_messages');
+  if (savedWishesStr) {
+    try {
+      const wishes = JSON.parse(savedWishesStr);
+      const wish = wishes.find(w => w.id === wishId || String(w.id) === String(wishId));
+      if (wish) {
+        renderWishData(wish);
+        return;
+      }
+    } catch (e) {
+      console.warn('Error parsing saved messages:', e);
+    }
+  }
+}
+
+function renderWishData(data) {
+  const cardText = document.getElementById('card-text');
+  const cardFestival = document.getElementById('card-festival-name');
+  const cardSignature = document.getElementById('card-signature');
+  
+  currentFestivalId = data.festival_id || data.festivals?.id || null;
+  
+  if (cardText) cardText.textContent = data.message_text;
+  if (cardFestival) {
+    cardFestival.textContent = `🏷️ ${data.festivals?.name || data.festival_name || 'เทศกาล'}`;
+  }
+  if (cardSignature) {
+    cardSignature.textContent = data.is_anonymous ? '✍️ ผู้ไม่ประสงค์ออกนาม' : `✍️ ${data.signature || 'ผู้เขียนคำอวยพร'}`;
+  }
+}
+
 async function fetchAndRenderWish(supabase, wishId) {
   const cardText = document.getElementById('card-text');
   const cardFestival = document.getElementById('card-festival-name');
   const cardSignature = document.getElementById('card-signature');
   
+  if (String(wishId).startsWith('mock')) {
+    console.log('Mock wish detected, skipping Supabase query');
+    return;
+  }
+
   try {
     const { data, error } = await supabase
       .from('messages')
@@ -72,8 +143,11 @@ async function fetchAndRenderWish(supabase, wishId) {
     }
   } catch (error) {
     console.error('Error loading wish details:', error);
-    if (cardText) cardText.textContent = 'ไม่สามารถดึงข้อมูลคำอวยพรได้ หรืออาจถูกแอดมินลบออกแล้ว 🍂';
-    showToast('เกิดข้อผิดพลาดในการโหลดข้อมูลคำอวยพร: ' + error.message, 'error');
+    // Only overwrite if it is still displaying the loading state
+    if (cardText && cardText.textContent.includes('กำลังดึงข้อมูล')) {
+      cardText.textContent = 'ไม่สามารถดึงข้อมูลคำอวยพรได้ หรืออาจถูกแอดมินลบออกแล้ว 🍂';
+      showToast('เกิดข้อผิดพลาดในการโหลดข้อมูลคำอวยพร: ' + error.message, 'error');
+    }
   }
 }
 
@@ -121,6 +195,7 @@ function renderCustomColors() {
     <div class="relative group inline-block">
       <button type="button" class="color-swatch custom-swatch w-10 h-10 rounded-full border-2 border-pencil focus:scale-110 shadow-[2px_2px_0px_var(--color-pencil)] active:translate-x-[1px] active:translate-y-[1px] active:shadow-none transition-all" 
               style="background-color: ${color};" data-color="${color}"></button>
+      <button type="button" class="btn-edit-color absolute -top-1 -left-1 bg-wood-yellow border border-pencil text-[9px] font-black w-4 h-4 rounded-full flex items-center justify-center shadow-[1px_1px_0px_0px_#4a3c31] hover:scale-110 active:scale-95" data-index="${index}" title="แก้ไขสี">✎</button>
       <button type="button" class="btn-delete-color absolute -top-1 -right-1 bg-wood-red border border-pencil text-[9px] font-black w-4 h-4 rounded-full flex items-center justify-center shadow-[1px_1px_0px_0px_#4a3c31] hover:scale-110 active:scale-95" data-index="${index}" title="ลบสี">×</button>
     </div>
   `).join('');
@@ -147,6 +222,32 @@ function renderCustomColors() {
       if (cardArea) {
         cardArea.style.backgroundColor = color;
       }
+    });
+  });
+
+  // Attach edit triggers
+  list.querySelectorAll('.btn-edit-color').forEach(btn => {
+    btn.addEventListener('click', (e) => {
+      e.stopPropagation();
+      const index = parseInt(btn.getAttribute('data-index'));
+      if (isNaN(index)) return;
+
+      editingColorIndex = index;
+      const color = customColors[index];
+
+      // Populate color modal fields
+      const colorPicker = document.getElementById('user-color-picker');
+      const colorHex = document.getElementById('user-color-hex');
+      const modalTitle = document.getElementById('color-modal-title');
+      const submitBtn = document.getElementById('btn-submit-color');
+
+      if (colorPicker) colorPicker.value = color;
+      if (colorHex) colorHex.value = color.toUpperCase();
+      if (modalTitle) modalTitle.textContent = '🎨 แก้ไขสีกระดาษ';
+      if (submitBtn) submitBtn.textContent = 'บันทึกการแก้ไข 💾';
+
+      // Open modal
+      document.getElementById('add-color-modal')?.classList.remove('hidden');
     });
   });
 
@@ -191,11 +292,6 @@ async function saveCustomColorsToDB() {
 async function handleAddCustomColor(e) {
   e.preventDefault();
 
-  if (customColors.length >= 5) {
-    showToast('บันทึกสีกำหนดเองได้สูงสุด 5 สีเท่านั้นครับ 🎨', 'warning');
-    return;
-  }
-
   const hexInput = document.getElementById('user-color-hex');
   const color = hexInput?.value.trim();
 
@@ -205,27 +301,62 @@ async function handleAddCustomColor(e) {
   }
 
   const cleanColor = color.toLowerCase();
-  customColors.push(cleanColor);
-  saveCustomColorsToDB(); // Instant update to localStorage and rendering
 
-  // Automatically select the newly added color
-  const cardArea = document.getElementById('capture-card-area');
-  if (cardArea) {
-    cardArea.style.backgroundColor = cleanColor;
-  }
+  if (editingColorIndex !== null) {
+    // Editing existing custom color
+    customColors[editingColorIndex] = cleanColor;
+    saveCustomColorsToDB();
 
-  showToast('บันทึกสีกำหนดเองเรียบร้อย! ✨', 'success');
-  closeColorModal();
-
-  // Highlight the newly added color swatch
-  setTimeout(() => {
-    const swatches = document.querySelectorAll('.color-swatch');
-    swatches.forEach(s => s.classList.remove('scale-110', 'ring-4', 'ring-pencil/30'));
-    const newSwatch = Array.from(swatches).find(s => s.getAttribute('data-color') === cleanColor);
-    if (newSwatch) {
-      newSwatch.classList.add('scale-110', 'ring-4', 'ring-pencil/30');
+    const cardArea = document.getElementById('capture-card-area');
+    if (cardArea) {
+      cardArea.style.backgroundColor = cleanColor;
     }
-  }, 50);
+
+    showToast('แก้ไขสีกระดาษเรียบร้อย! ✨', 'success');
+    closeColorModal();
+
+    // Highlight the modified color swatch
+    const modifiedIndex = editingColorIndex;
+    editingColorIndex = null;
+    
+    setTimeout(() => {
+      const swatches = document.querySelectorAll('.color-swatch');
+      swatches.forEach(s => s.classList.remove('scale-110', 'ring-4', 'ring-pencil/30'));
+      const customSwatches = document.querySelectorAll('.custom-swatch');
+      if (customSwatches[modifiedIndex]) {
+        customSwatches[modifiedIndex].classList.add('scale-110', 'ring-4', 'ring-pencil/30');
+      }
+    }, 50);
+
+  } else {
+    // Adding new custom color
+    if (customColors.length >= 5) {
+      showToast('บันทึกสีกำหนดเองได้สูงสุด 5 สีเท่านั้นครับ 🎨', 'warning');
+      return;
+    }
+
+    customColors.push(cleanColor);
+    saveCustomColorsToDB(); // Instant update to localStorage and rendering
+
+    // Automatically select the newly added color
+    const cardArea = document.getElementById('capture-card-area');
+    if (cardArea) {
+      cardArea.style.backgroundColor = cleanColor;
+    }
+
+    showToast('บันทึกสีกำหนดเองเรียบร้อย! ✨', 'success');
+    closeColorModal();
+
+    // Highlight the newly added color swatch
+    setTimeout(() => {
+      const swatches = document.querySelectorAll('.color-swatch');
+      swatches.forEach(s => s.classList.remove('scale-110', 'ring-4', 'ring-pencil/30'));
+      const newSwatch = Array.from(swatches).find(s => s.getAttribute('data-color') === cleanColor);
+      if (newSwatch) {
+        newSwatch.classList.add('scale-110', 'ring-4', 'ring-pencil/30');
+      }
+    }, 50);
+  }
 }
 
 function closeColorModal() {
@@ -267,6 +398,13 @@ function setupCustomizerEvents() {
 
   // Trigger modal open
   openModalBtn?.addEventListener('click', () => {
+    editingColorIndex = null;
+    const modalTitle = document.getElementById('color-modal-title');
+    const submitBtn = document.getElementById('btn-submit-color');
+
+    if (modalTitle) modalTitle.textContent = '🎨 ผสมสีกระดาษใหม่';
+    if (submitBtn) submitBtn.textContent = 'บันทึกสีนี้ 💾';
+
     if (colorHex && colorPicker) {
       colorPicker.value = '#FFFFFF';
       colorHex.value = '#FFFFFF';
