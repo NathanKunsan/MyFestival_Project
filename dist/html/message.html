@@ -1,0 +1,88 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>รับการ์ดคำอวยพร — MyFestival</title>
+  <!-- Supabase CDN -->
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <!-- Tailwind CSS CDN -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  <!-- Custom Sketchbook CSS -->
+  <link rel="stylesheet" href="/css/style.css">
+</head>
+<body class="bg-paper text-pencil paper-grain p-4">
+
+  <div id="page-content" class="w-full max-w-2xl mx-auto py-6">
+    <div class="space-y-6">
+      
+      <!-- Back button -->
+      <div class="flex justify-between items-center">
+        <a href="/" class="sketch-btn btn-cream text-sm py-1.5 px-4">
+          ⬅️ กลับหน้าแรก
+        </a>
+        <span id="festival-title" class="font-extrabold text-lg md:text-xl sketch-badge btn-orange">
+          ...
+        </span>
+      </div>
+
+      <!-- Tag Filter Input -->
+      <div class="flex flex-col sm:flex-row justify-end items-stretch sm:items-center gap-2 pt-2">
+        <label for="tag-filter-input" class="text-xs font-bold text-pencil-light text-right">กรองการสุ่มด้วยแท็ก:</label>
+        <input type="text" id="tag-filter-input" placeholder="เช่น ปีใหม่, อบอุ่น (คั่นด้วยจุลภาคหรือเว้นวรรค)" class="sketch-input text-xs py-1.5 px-3 w-full sm:w-64 bg-white shadow-sm">
+      </div>
+
+      <!-- Message Card Shell -->
+      <div id="message-container">
+        <!-- Message Card will be dynamically injected here -->
+        <div class="sketch-card p-12 text-center bg-white min-h-[300px] flex flex-col justify-center items-center">
+          <p class="text-xl font-bold animate-pulse">✏️ กำลังส่องหาคำอวยพรในสมุดบันทึก...</p>
+        </div>
+      </div>
+
+      <!-- Actions and controls below card -->
+      <div id="message-controls" class="hidden flex flex-col sm:flex-row gap-3 justify-center items-center pt-4">
+        <button id="btn-draw-random" class="sketch-btn btn-yellow text-lg py-2.5 px-6 w-full sm:w-auto hover-wiggle">
+          🎲 สุ่มคำอวยพรอีกครั้ง
+        </button>
+        <button id="btn-copy-link" class="sketch-btn btn-cream py-2.5 px-5 w-full sm:w-auto">
+          🔗 คัดลอกลิงก์แชร์
+        </button>
+        <button id="btn-download-card" class="sketch-btn btn-blue py-2.5 px-5 w-full sm:w-auto">
+          📥 ดาวน์โหลดการ์ดภาพ
+        </button>
+        <button id="btn-delete-post" class="sketch-btn btn-red py-2.5 px-5 w-full sm:w-auto hidden">
+          🗑️ ลบโพสต์นี้
+        </button>
+      </div>
+
+      <!-- Invisible canvas for PNG Card generation -->
+      <canvas id="share-card-canvas" class="hidden"></canvas>
+
+      <!-- Report Reason Modal -->
+      <div id="report-modal" class="hidden fixed inset-0 z-50 flex items-center justify-center bg-black/60 px-4">
+        <div class="sketch-card p-6 max-w-md w-full bg-white">
+          <h3 class="text-xl font-extrabold mb-2 text-wood-orange">🚩 รายงานคำอวยพรไม่เหมาะสม</h3>
+          <p class="text-pencil-light text-sm mb-4">โปรดแจ้งเหตุผลในการรายงานคำอวยพรนี้ เพื่อส่งข้อมูลให้ผู้ดูแลระบบตรวจสอบ</p>
+          
+          <form id="report-form" class="space-y-4">
+            <div class="flex flex-col gap-1">
+              <label for="report-reason" class="font-bold text-sm">เหตุผลในการรายงาน:</label>
+              <textarea id="report-reason" required rows="3" placeholder="ระบุเหตุผล เช่น มีเนื้อหาหยาบคาย หรือไม่เกี่ยวข้องกับเทศกาล..." class="sketch-input w-full resize-none"></textarea>
+            </div>
+            
+            <div class="sketch-divider"></div>
+            
+            <div class="flex justify-end gap-3">
+              <button type="button" id="btn-close-report" class="sketch-btn btn-cream px-4 py-2">ยกเลิก</button>
+              <button type="submit" class="sketch-btn btn-red px-5 py-2">ส่งรายงาน</button>
+            </div>
+          </form>
+        </div>
+      </div>
+
+    </div>
+  </div>
+
+</body>
+</html>

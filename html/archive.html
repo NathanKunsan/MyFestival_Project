@@ -1,0 +1,49 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>คลังเทศกาล — MyFestival</title>
+  <!-- Supabase CDN -->
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <!-- Tailwind CSS CDN -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  <!-- Custom Sketchbook CSS -->
+  <link rel="stylesheet" href="/css/style.css">
+</head>
+<body class="bg-paper text-pencil paper-grain p-4">
+
+  <div id="page-content" class="w-full max-w-4xl mx-auto py-6">
+    <div class="space-y-8">
+      <div class="text-center max-w-xl mx-auto space-y-2">
+        <h1 class="text-3xl md:text-4xl font-extrabold hover-wiggle">
+          💾 <span class="scribble-highlight">คลังเทศกาลประเพณี</span>
+        </h1>
+        <p class="text-pencil-light font-bold">
+          ถึงแม้ช่วงเวลาการจัดงานเทศกาลจะสิ้นสุดลงแล้ว แต่คำอวยพรดีๆ และเรื่องราวยังคงถูกบันทึกไว้ตราบนานเท่านาน คุณสามารถสุ่มอ่านและแชร์ความสุขต่อได้ตลอดปี
+        </p>
+      </div>
+
+      <!-- Search Filter -->
+      <div class="max-w-md mx-auto">
+        <div class="relative">
+          <input type="text" id="archive-search" placeholder="🔍 ค้นหาเทศกาลที่บันทึกไว้..." class="sketch-input w-full pl-10">
+        </div>
+      </div>
+
+      <!-- Lined Notebook Catalog containing Archived Festivals -->
+      <div class="sketch-card p-6 md:p-8 bg-white max-w-4xl mx-auto shadow-[6px_6px_0px_0px_#4a3c31]">
+        <h2 class="text-xl font-extrabold mb-6 border-b-2 border-pencil pb-2">📂 บันทึกสารบัญเทศกาลประเพณีทั้งหมด</h2>
+        
+        <div id="archive-grid" class="grid grid-cols-1 md:grid-cols-2 gap-6">
+          <!-- Loading indicator -->
+          <div class="col-span-full text-center py-12">
+            <p class="text-lg font-bold animate-pulse">✏️ กำลังเปิดค้นลิ้นชักประเพณี...</p>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+</body>
+</html>

@@ -1,0 +1,93 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>เสนอเทศกาลประเพณีใหม่ — MyFestival</title>
+  <!-- Supabase CDN -->
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <!-- Tailwind CSS CDN -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  <!-- Custom Sketchbook CSS -->
+  <link rel="stylesheet" href="/css/style.css">
+  <!-- Flatpickr Date Picker CDN -->
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/flatpickr/dist/flatpickr.min.css">
+  <script src="https://cdn.jsdelivr.net/npm/flatpickr"></script>
+  <script src="https://cdn.jsdelivr.net/npm/flatpickr/dist/l10n/th.js"></script>
+</head>
+<body class="bg-paper text-pencil paper-grain p-4">
+
+  <div id="page-content" class="w-full max-w-xl mx-auto py-6">
+    <div class="sketch-card p-6 md:p-8 bg-white">
+      <h2 class="text-3xl font-extrabold text-center mb-2">🎡 เสนอชื่อเทศกาลประเพณีใหม่</h2>
+      <p class="text-center text-pencil-light text-sm mb-6">ร่วมสร้างสรรค์ประเพณีใหม่เข้าสู่ระบบ ข้อมูลทั้งหมดของคุณจะถูกส่งให้ผู้ดูแลระบบตรวจสอบและอนุมัติก่อนเผยแพร่จริง</p>
+      
+      <form id="suggest-festival-form" class="space-y-4">
+        <!-- Festival Name -->
+        <div class="flex flex-col gap-1">
+          <label for="suggest-name-input" class="font-bold text-sm">ชื่อเทศกาลประเพณี:</label>
+          <input type="text" id="suggest-name-input" required placeholder="เช่น เทศกาลลอยกระทง, คริสต์มาส" class="sketch-input w-full">
+        </div>
+        
+        <!-- Description -->
+        <div class="flex flex-col gap-1">
+          <label for="suggest-desc-input" class="font-bold text-sm">รายละเอียด/คำอธิบายเทศกาล:</label>
+          <textarea id="suggest-desc-input" required rows="3" placeholder="อธิบายประเพณีหรือเทศกาลนี้โดยย่อ..." class="sketch-input w-full resize-none"></textarea>
+        </div>
+
+        <!-- Image Upload -->
+        <div class="flex flex-col gap-1">
+          <label for="suggest-image-input" class="font-bold text-sm">รูปภาพประกอบเทศกาล (ไม่บังคับ, แนะนำขนาด 800x533 px):</label>
+          <input type="file" id="suggest-image-input" accept="image/*" class="sketch-input w-full">
+          <div id="suggest-image-preview-container" class="hidden mt-2 border-2 border-pencil rounded-lg overflow-hidden max-w-xs relative bg-white">
+            <img id="suggest-image-preview" class="w-full h-auto object-cover max-h-40" alt="ตัวอย่างภาพเทศกาล">
+            <button type="button" id="btn-remove-suggest-image" class="absolute top-1 right-1 bg-wood-red border-2 border-pencil text-pencil font-bold text-xs rounded-full w-5 h-5 flex items-center justify-center shadow-[1px_1px_0px_0px_#4a3c31] cursor-pointer">×</button>
+          </div>
+        </div>
+
+        <!-- Date Range -->
+        <div class="grid grid-cols-2 gap-3">
+          <div class="flex flex-col gap-1">
+            <label for="suggest-start-date" class="font-bold text-sm">วันเริ่มต้นเทศกาล:</label>
+            <input type="text" id="suggest-start-date" required placeholder="เลือกวันเริ่มต้น" class="sketch-input w-full">
+          </div>
+          <div class="flex flex-col gap-1">
+            <label for="suggest-end-date" class="font-bold text-sm">วันสิ้นสุดเทศกาล:</label>
+            <input type="text" id="suggest-end-date" required placeholder="เลือกวันสิ้นสุด" class="sketch-input w-full">
+          </div>
+        </div>
+
+        <!-- First Wish Input Wrapper (Shown dynamically based on role) -->
+        <div id="suggest-wish-container" class="flex flex-col gap-1 hidden">
+          <label for="suggest-wish-input" class="font-bold text-sm">เขียนคำอวยพรชิ้นแรก:</label>
+          <textarea id="suggest-wish-input" rows="3" placeholder="เขียนคำอวยพรอบอุ่นใจคู่กับประเพณีนี้..." class="sketch-input w-full resize-none"></textarea>
+        </div>
+        
+        <!-- Signature -->
+        <div class="flex flex-col gap-1">
+          <label for="suggest-sig-input" class="font-bold text-sm">นามปากกาผู้เสนอ (Signature):</label>
+          <input type="text" id="suggest-sig-input" class="sketch-input w-full">
+        </div>
+        
+        <!-- Anonymous option -->
+        <div class="flex items-center gap-2 py-1">
+          <input type="checkbox" id="suggest-anonymous-checkbox" class="accent-pencil h-4 w-4">
+          <label for="suggest-anonymous-checkbox" class="font-bold text-sm select-none cursor-pointer">
+            ส่งแบบไม่ประสงค์ออกนาม (Anonymous)
+          </label>
+        </div>
+        
+        <!-- Divider -->
+        <div class="sketch-divider"></div>
+        
+        <!-- Controls -->
+        <div class="flex justify-end gap-3">
+          <a href="/" class="sketch-btn btn-cream px-5 py-2">ยกเลิก</a>
+          <button type="submit" class="sketch-btn btn-orange px-6 py-2">ส่งข้อเสนอแนะ 🎡</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+</body>
+</html>

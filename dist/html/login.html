@@ -1,0 +1,48 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>เข้าสู่ระบบ — MyFestival</title>
+  <!-- Supabase CDN -->
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <!-- Tailwind CSS CDN -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  <!-- Custom Sketchbook CSS -->
+  <link rel="stylesheet" href="/css/style.css">
+</head>
+<body class="bg-paper text-pencil paper-grain p-4">
+
+  <div id="page-content" class="w-full max-w-md mx-auto py-6">
+    <div class="sketch-card p-6 md:p-8 bg-white">
+      <h2 class="text-3xl font-extrabold text-center mb-2">✏️ เข้าสู่ระบบ</h2>
+      <p class="text-center text-pencil-light text-sm mb-6">ยินดีต้อนรับกลับมา! กรอกข้อมูลด้านล่างเพื่อเข้าสู่สมุดความรักของคุณ</p>
+      
+      <!-- Login Form -->
+      <form id="login-form" class="space-y-4">
+        <div class="flex flex-col gap-1">
+          <label for="login-email" class="font-bold text-sm">อีเมล (Email):</label>
+          <input type="email" id="login-email" required placeholder="example@email.com" class="sketch-input w-full">
+        </div>
+        
+        <div class="flex flex-col gap-1">
+          <label for="login-password" class="font-bold text-sm">รหัสผ่าน (Password):</label>
+          <input type="password" id="login-password" required placeholder="••••••••" class="sketch-input w-full">
+        </div>
+        
+        <button type="submit" class="sketch-btn btn-yellow w-full py-2.5 mt-2 text-lg">
+          เข้าสู่ระบบด้วยอีเมล ✉️
+        </button>
+      </form>
+      
+
+      
+      <div class="text-center mt-6 text-sm font-bold">
+        <span class="text-pencil-light">ยังไม่มีบัญชีใช่หรือไม่?</span>
+        <a href="/register" class="text-wood-orange hover:underline ml-1">สมัครสมาชิกที่นี่</a>
+      </div>
+    </div>
+  </div>
+
+</body>
+</html>
