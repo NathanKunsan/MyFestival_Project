@@ -269,6 +269,7 @@ function setupAddMessageForm() {
     const text = document.getElementById('msg-text-input').value.trim();
     const sig = document.getElementById('msg-sig-input').value.trim();
     const anonymous = document.getElementById('msg-anonymous-checkbox').checked;
+    const tags = document.getElementById('msg-tags-input')?.value.trim() || '';
     
     const submitBtn = form.querySelector('button[type="submit"]');
     const origText = submitBtn.textContent;
@@ -277,18 +278,43 @@ function setupAddMessageForm() {
     
     try {
       const isApproved = userProfile?.role === 'admin';
-      const { error } = await supabase
+      
+      let insertData = {
+        festival_id: festivalId,
+        contributor_id: currentUserId,
+        message_text: text,
+        signature: sig || null,
+        is_anonymous: anonymous,
+        status: isApproved ? 'approved' : 'pending',
+        tags: tags || null
+      };
+
+      let { error } = await supabase
         .from('messages')
-        .insert({
-          festival_id: festivalId,
-          contributor_id: currentUserId,
-          message_text: text,
-          signature: sig || null,
-          is_anonymous: anonymous,
-          status: isApproved ? 'approved' : 'pending'
-        });
+        .insert(insertData);
+        
+      if (error && error.message.includes('tags')) {
+        // Fallback insert without tags column
+        delete insertData.tags;
+        const { error: fallbackErr } = await supabase
+          .from('messages')
+          .insert(insertData);
+        error = fallbackErr;
+      }
         
       if (error) throw error;
+      
+      // Notify admin if custom tags are provided
+      if (tags) {
+        await supabase
+          .from('notifications')
+          .insert({
+            user_id: null, // null represents admins
+            title: '🏷️ ผู้ใช้เสนอแท็กใหม่',
+            content: `ผู้ใช้ ${sig || 'ผู้เขียน'} ได้เสนอแท็กใหม่: "${tags}" บนข้อความใหม่`,
+            type: 'system'
+          });
+      }
       
       // Log add activity
       await supabase.from('activity_logs').insert({
@@ -352,6 +378,11 @@ function openEditModal(message) {
     }
   }
   editAnonCheckbox.checked = message.is_anonymous;
+  
+  const editTagsInput = document.getElementById('edit-tags-input');
+  if (editTagsInput) {
+    editTagsInput.value = message.tags || '';
+  }
   
   const notice = document.getElementById('edit-notice');
   if (message.status === 'approved') {
@@ -433,6 +464,7 @@ function setupEditModalEvents() {
     const text = document.getElementById('edit-text-input').value.trim();
     const sig = document.getElementById('edit-sig-input').value.trim();
     const anonymous = document.getElementById('edit-anonymous-checkbox').checked;
+    const tags = document.getElementById('edit-tags-input')?.value.trim() || '';
     
     const submitBtn = editForm.querySelector('button[type="submit"]');
     const origText = submitBtn.textContent;
@@ -444,18 +476,41 @@ function setupEditModalEvents() {
       
       if (editMessageObj.status === 'approved' && !isApproved) {
         // Edit Approved Message -> Create a new revision entry in message_revisions
-        const { error } = await supabase
+        let insertData = {
+          message_id: editMessageObj.id,
+          festival_id: festivalId,
+          message_text: text,
+          signature: sig || null,
+          is_anonymous: anonymous,
+          status: 'pending',
+          tags: tags || null
+        };
+
+        let { error } = await supabase
           .from('message_revisions')
-          .insert({
-            message_id: editMessageObj.id,
-            festival_id: festivalId,
-            message_text: text,
-            signature: sig || null,
-            is_anonymous: anonymous,
-            status: 'pending'
-          });
+          .insert(insertData);
+          
+        if (error && error.message.includes('tags')) {
+          delete insertData.tags;
+          const { error: fallbackErr } = await supabase
+            .from('message_revisions')
+            .insert(insertData);
+          error = fallbackErr;
+        }
           
         if (error) throw error;
+        
+        // Notify admin if custom tags are provided
+        if (tags) {
+          await supabase
+            .from('notifications')
+            .insert({
+              user_id: null,
+              title: '🏷️ ผู้ใช้เสนอแท็กใหม่ (แก้ไขคำอวยพร)',
+              content: `ผู้ใช้ ${sig || 'ผู้เขียน'} ได้เสนอแท็กใหม่: "${tags}" บนข้อความที่แก้ไข`,
+              type: 'system'
+            });
+        }
         
         await supabase.from('activity_logs').insert({
           user_id: currentUserId,
@@ -466,19 +521,43 @@ function setupEditModalEvents() {
         showToast('ส่งข้อความแก้ไขเข้ารอการตรวจสอบใหม่สำเร็จแล้ว! ข้อความออริจินัลยังคงแสดงผลอยู่ตามปกติ', 'success');
       } else {
         // Edit Pending / Rejected Message OR Admin editing -> Update messages table directly
-        const { error } = await supabase
+        let updateData = {
+          festival_id: festivalId,
+          message_text: text,
+          signature: sig || null,
+          is_anonymous: anonymous,
+          status: isApproved ? 'approved' : 'pending',
+          rejection_reason: null, // Clear previous rejection reason
+          tags: tags || null
+        };
+
+        let { error } = await supabase
           .from('messages')
-          .update({
-            festival_id: festivalId,
-            message_text: text,
-            signature: sig || null,
-            is_anonymous: anonymous,
-            status: isApproved ? 'approved' : 'pending',
-            rejection_reason: null // Clear previous rejection reason
-          })
+          .update(updateData)
           .eq('id', editMessageObj.id);
           
+        if (error && error.message.includes('tags')) {
+          delete updateData.tags;
+          const { error: fallbackErr } = await supabase
+            .from('messages')
+            .update(updateData)
+            .eq('id', editMessageObj.id);
+          error = fallbackErr;
+        }
+          
         if (error) throw error;
+        
+        // Notify admin if custom tags are provided
+        if (tags) {
+          await supabase
+            .from('notifications')
+            .insert({
+              user_id: null,
+              title: '🏷️ ผู้ใช้เสนอแท็กใหม่ (อัปเดตตรง)',
+              content: `ผู้ใช้ ${sig || 'ผู้เขียน'} ได้เสนอแท็กใหม่: "${tags}" บนข้อความเดิม`,
+              type: 'system'
+            });
+        }
         
         await supabase.from('activity_logs').insert({
           user_id: currentUserId,
