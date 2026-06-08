@@ -9,8 +9,7 @@ const configBanner = document.getElementById('config-banner');
 const configModal = document.getElementById('config-modal');
 const configForm = document.getElementById('config-form');
 const configUrlInput = document.getElementById('config-url');
-const configKeyInput = document.getElementById('config-key');
-const configCloseBtn = document.getElementById('config-close-btn');
+const configKeyInput = document.getElemen);
 const btnOpenConfig = document.getElementById('btn-open-config');
 
 // Navigation links
