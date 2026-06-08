@@ -9,6 +9,7 @@ let messagesSubscription = null;
 let festivalsSubscription = null;
 let isInitialLoad = true;
 let userRole = 'guest';
+let sliderInterval = null;
 
 // Initialize Festival Page
 export const init = async () => {
@@ -27,6 +28,7 @@ export const init = async () => {
   setupSliderEvents();
   setupRealtime(supabase);
   setupGlobalLockEvents();
+  startSliderAutoPlay();
 };
 
 function setupGlobalLockEvents() {
@@ -254,79 +256,91 @@ function renderHeroSlider() {
 }
 
 // Update the DOM for the active slide in the Hero
+// Update the DOM for the active slide in the Hero with smooth transition (Plan 2)
 function updateSliderContent() {
   const heroSlider = document.getElementById('hero-slider');
   if (!heroSlider || festivalsData.length === 0) return;
   
-  const festival = festivalsData[currentSliderIndex];
-  const approvedCount = festival.messages.filter(m => m.status === 'approved').length;
-  const startStr = formatDate(festival.start_date);
-  const endStr = formatDate(festival.end_date);
+  // Fade out
+  heroSlider.classList.remove('slide-fade-in');
+  heroSlider.classList.add('slide-fade-out');
   
-  const now = new Date();
-  const isActive = new Date(festival.start_date) <= now && new Date(festival.end_date) >= now;
-  const isUpcoming = new Date(festival.start_date) > now;
-  
-  let statusBadge = '';
-  if (isActive) {
-    statusBadge = '<span class="sketch-badge btn-green text-xs font-extrabold">🔴 กำลังจัดขึ้น</span>';
-  } else if (isUpcoming) {
-    statusBadge = '<span class="sketch-badge btn-orange text-xs font-extrabold">📅 เร็วๆ นี้</span>';
-  } else {
-    statusBadge = '<span class="sketch-badge btn-cream text-xs font-extrabold">💾 ผ่านไปแล้ว</span>';
-  }
-  
-  heroSlider.innerHTML = `
-    <!-- Slider Left: polaroid photo -->
-    <div class="w-full md:w-1/2 flex justify-center">
-      <div class="sketch-card sketch-card-alt p-3 bg-white rotate-[-1deg] max-w-sm">
-        <div class="w-full aspect-[4/3] rounded border-2 border-pencil overflow-hidden mb-3">
-          <img src="${festival.image_url || 'https://images.unsplash.com/photo-1513151233558-d860c5398176?w=800'}" 
-               alt="${festival.name}" 
-               class="w-full h-full object-cover">
-        </div>
-        <div class="text-center font-bold text-lg">${festival.name}</div>
-      </div>
-    </div>
+  setTimeout(() => {
+    const festival = festivalsData[currentSliderIndex];
+    const approvedCount = festival.messages.filter(m => m.status === 'approved').length;
+    const startStr = formatDate(festival.start_date);
+    const endStr = formatDate(festival.end_date);
     
-    <!-- Slider Right: details & call to actions -->
-    <div class="w-full md:w-1/2 space-y-4">
-      <div class="flex items-center gap-2">
-        ${statusBadge}
-        <span class="sketch-badge btn-yellow text-xs font-extrabold">💌 ${approvedCount} คำอวยพร</span>
+    const now = new Date();
+    const isActive = new Date(festival.start_date) <= now && new Date(festival.end_date) >= now;
+    const isUpcoming = new Date(festival.start_date) > now;
+    
+    let statusBadge = '';
+    if (isActive) {
+      statusBadge = '<span class="sketch-badge btn-green text-xs font-extrabold">🔴 กำลังจัดขึ้น</span>';
+    } else if (isUpcoming) {
+      statusBadge = '<span class="sketch-badge btn-orange text-xs font-extrabold">📅 เร็วๆ นี้</span>';
+    } else {
+      statusBadge = '<span class="sketch-badge btn-cream text-xs font-extrabold">💾 ผ่านไปแล้ว</span>';
+    }
+    
+    heroSlider.innerHTML = `
+      <!-- Slider Left: polaroid photo -->
+      <div class="w-full md:w-1/2 flex justify-center">
+        <div class="sketch-card sketch-card-alt p-3 bg-white rotate-[-1deg] max-w-sm">
+          <div class="w-full aspect-[4/3] rounded border-2 border-pencil overflow-hidden mb-3">
+            <img src="${festival.image_url || 'https://images.unsplash.com/photo-1513151233558-d860c5398176?w=800'}" 
+                 alt="${festival.name}" 
+                 class="w-full h-full object-cover">
+          </div>
+          <div class="text-center font-bold text-lg">${festival.name}</div>
+        </div>
       </div>
       
-      <h2 class="text-3xl font-extrabold">${festival.name}</h2>
-      <p class="text-sm font-bold text-pencil-light">
-        🗓️ ${startStr} - ${endStr}
-      </p>
-      
-      <p class="text-base text-pencil-light">
-        ${festival.description || 'เชิญร่วมสุ่มเปิดรับการ์ดอวยพรหรือฝากคำอวยพรเพื่อส่งต่อความสุขให้เพื่อนพ้องพี่น้องชาวไทยได้เลย!'}
-      </p>
-      
-      <div class="pt-4 flex flex-wrap gap-2">
-        ${isUpcoming
-          ? `<button class="sketch-btn btn-cream py-2.5 px-6 opacity-60 text-lg btn-upcoming-lock">
-               ⏳ ยังไม่เริ่ม
-             </button>`
-          : new Date(festival.end_date) < now
-            ? `<button class="sketch-btn btn-cream py-2.5 px-6 opacity-60 text-lg btn-ended-lock">
-                 💾 สิ้นสุดเทศกาลแล้ว
+      <!-- Slider Right: details & call to actions -->
+      <div class="w-full md:w-1/2 space-y-4">
+        <div class="flex items-center gap-2">
+          ${statusBadge}
+          <span class="sketch-badge btn-yellow text-xs font-extrabold">💌 ${approvedCount} คำอวยพร</span>
+        </div>
+        
+        <h2 class="text-3xl font-extrabold">${festival.name}</h2>
+        <p class="text-sm font-bold text-pencil-light">
+          🗓️ ${startStr} - ${endStr}
+        </p>
+        
+        <p class="text-base text-pencil-light">
+          ${festival.description || 'เชิญร่วมสุ่มเปิดรับการ์ดอวยพรหรือฝากคำอวยพรเพื่อส่งต่อความสุขให้เพื่อนพ้องพี่น้องชาวไทยได้เลย!'}
+        </p>
+        
+        <div class="pt-4 flex flex-wrap gap-2">
+          ${isUpcoming
+            ? `<button class="sketch-btn btn-cream py-2.5 px-6 opacity-60 text-lg btn-upcoming-lock">
+                 ⏳ ยังไม่เริ่ม
                </button>`
-            : `<a href="/message/${festival.id}" class="sketch-btn btn-yellow text-lg py-2.5 px-6">
-                 🎲 สุ่มคำอวยพร
+            : new Date(festival.end_date) < now
+              ? `<button class="sketch-btn btn-cream py-2.5 px-6 opacity-60 text-lg btn-ended-lock">
+                   💾 สิ้นสุดเทศกาลแล้ว
+                 </button>`
+              : `<a href="/message/${festival.id}" class="sketch-btn btn-yellow text-lg py-2.5 px-6">
+                   🎲 สุ่มคำอวยพร
+                 </a>`
+          }
+          ${(['contributor', 'admin'].includes(userRole) || localStorage.getItem('myfestival_dev_bypass') === 'true')
+            ? `<a href="/contributor" class="sketch-btn btn-cream py-2.5 px-6">
+                 ✍️ ส่งคำอวยพร
                </a>`
-        }
-        ${(['contributor', 'admin'].includes(userRole) || localStorage.getItem('myfestival_dev_bypass') === 'true')
-          ? `<a href="/contributor" class="sketch-btn btn-cream py-2.5 px-6">
-               ✍️ ส่งคำอวยพร
-             </a>`
-          : ''
-        }
+            : ''
+          }
+        </div>
       </div>
-    </div>
-  `;
+    `;
+    
+    // Trigger reflow to apply transition
+    void heroSlider.offsetWidth;
+    heroSlider.classList.remove('slide-fade-out');
+    heroSlider.classList.add('slide-fade-in');
+  }, 400); // 400ms transition delay
 }
 
 // Setup navigation triggers for the Hero Slider
@@ -338,12 +352,14 @@ function setupSliderEvents() {
     if (festivalsData.length === 0) return;
     currentSliderIndex = (currentSliderIndex - 1 + festivalsData.length) % festivalsData.length;
     updateSliderContent();
+    startSliderAutoPlay(); // Reset timer
   });
   
   nextBtn?.addEventListener('click', () => {
     if (festivalsData.length === 0) return;
     currentSliderIndex = (currentSliderIndex + 1) % festivalsData.length;
     updateSliderContent();
+    startSliderAutoPlay(); // Reset timer
   });
 
   // Touch swipe events for mobile support
@@ -368,13 +384,32 @@ function setupSliderEvents() {
         if (festivalsData.length === 0) return;
         currentSliderIndex = (currentSliderIndex + 1) % festivalsData.length;
         updateSliderContent();
+        startSliderAutoPlay(); // Reset timer
       } else if (swipeDistance > 50) {
         // Swipe right -> Prev slide
         if (festivalsData.length === 0) return;
         currentSliderIndex = (currentSliderIndex - 1 + festivalsData.length) % festivalsData.length;
         updateSliderContent();
+        startSliderAutoPlay(); // Reset timer
       }
     }
+  }
+}
+
+// Autoplay slider logic
+function startSliderAutoPlay() {
+  stopSliderAutoPlay();
+  sliderInterval = setInterval(() => {
+    if (festivalsData.length === 0) return;
+    currentSliderIndex = (currentSliderIndex + 1) % festivalsData.length;
+    updateSliderContent();
+  }, 8000); // Rotate every 8 seconds
+}
+
+function stopSliderAutoPlay() {
+  if (sliderInterval) {
+    clearInterval(sliderInterval);
+    sliderInterval = null;
   }
 }
 
@@ -428,6 +463,7 @@ function setupRealtime(supabase) {
 }
 
 export const cleanup = () => {
+  stopSliderAutoPlay();
   if (messagesSubscription) {
     messagesSubscription.unsubscribe();
     messagesSubscription = null;
