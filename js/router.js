@@ -323,8 +323,8 @@ export function showToast(message, type = 'info') {
   
   // Auto remove toast
   setTimeout(() => {
-    toast.style.animation = 'slideUp 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275) reverse forwards';
-    setTimeout(() => toast.remove(), 300);
+    toast.classList.add('toast-fadeOut');
+    setTimeout(() => toast.remove(), 400);
   }, 3000);
 }
 
@@ -671,6 +671,11 @@ export async function refreshAuthUI() {
 
       // Show suggest tab for everyone
       navSuggest?.classList.remove('hidden');
+
+      // Initialize Chat Widget
+      import('./chat.js').then(chatModule => {
+        chatModule.initChatWidget(authStatus.user, authStatus.profile);
+      }).catch(err => console.error('Failed to load chat module:', err));
     } else {
       // Guest view
       navLogin?.classList.remove('hidden');
@@ -684,6 +689,11 @@ export async function refreshAuthUI() {
       
       // Guest can see suggest tab (will show login alert on click)
       navSuggest?.classList.remove('hidden');
+
+      // Clean up Chat Widget
+      import('./chat.js').then(chatModule => {
+        chatModule.cleanupChatWidget();
+      }).catch(err => console.error('Failed to cleanup chat module:', err));
     }
   } catch (error) {
     console.error('Error refreshing Auth UI:', error);
@@ -697,6 +707,9 @@ navLogout?.addEventListener('click', async () => {
     userProfileSubscription = null;
   }
   clearNotifChannels();
+  import('./chat.js').then(chatModule => {
+    chatModule.cleanupChatWidget();
+  }).catch(err => console.error('Failed to cleanup chat module on logout:', err));
   await signOut();
 });
 
