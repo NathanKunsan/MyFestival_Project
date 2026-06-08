@@ -278,15 +278,14 @@ function renderCustomColors() {
       const color = customColors[index];
 
       // Populate color modal fields
-      const colorPicker = document.getElementById('user-color-picker');
-      const colorHex = document.getElementById('user-color-hex');
       const modalTitle = document.getElementById('color-modal-title');
       const submitBtn = document.getElementById('btn-submit-color');
 
-      if (colorPicker) colorPicker.value = color;
-      if (colorHex) colorHex.value = color.toUpperCase();
       if (modalTitle) modalTitle.textContent = '🎨 แก้ไขสีกระดาษ';
       if (submitBtn) submitBtn.textContent = 'บันทึกการแก้ไข 💾';
+
+      const hsl = hexToHsl(color);
+      updateHslUI(hsl.h, hsl.s, hsl.l);
 
       // Open modal
       document.getElementById('add-color-modal')?.classList.remove('hidden');
@@ -331,6 +330,102 @@ async function saveCustomColorsToDB() {
   renderCustomColors();
 }
 
+function hslToHex(h, s, l) {
+  l /= 100;
+  const a = s * Math.min(l, 1 - l) / 100;
+  const f = n => {
+    const k = (n + h / 30) % 12;
+    const color = l - a * Math.max(Math.min(k - 3, 9 - k, 1), -1);
+    return Math.round(255 * color).toString(16).padStart(2, '0');
+  };
+  return `#${f(0)}${f(8)}${f(4)}`;
+}
+
+function hexToHsl(hex) {
+  const shorthandRegex = /^#?([a-f\d])([a-f\d])([a-f\d])$/i;
+  hex = hex.replace(shorthandRegex, (m, r, g, b) => r + r + g + g + b + b);
+  const result = /^#?([a-f\d]{2})([a-f\d]{2})([a-f\d]{2})$/i.exec(hex);
+  if (!result) return { h: 0, s: 0, l: 90 };
+  
+  let r = parseInt(result[1], 16) / 255;
+  let g = parseInt(result[2], 16) / 255;
+  let b = parseInt(result[3], 16) / 255;
+  
+  const max = Math.max(r, g, b), min = Math.min(r, g, b);
+  let h, s, l = (max + min) / 2;
+  
+  if (max === min) {
+    h = s = 0;
+  } else {
+    const d = max - min;
+    s = l > 0.5 ? d / (2 - max - min) : d / (max + min);
+    switch (max) {
+      case r: h = (g - b) / d + (g < b ? 6 : 0); break;
+      case g: h = (b - r) / d + 2; break;
+      case b: h = (r - g) / d + 4; break;
+    }
+    h /= 6;
+  }
+  
+  return {
+    h: Math.round(h * 360),
+    s: Math.round(s * 100),
+    l: Math.round(l * 100)
+  };
+}
+
+function updateHslUI(h, s, l) {
+  const hueSlider = document.getElementById('hsl-hue');
+  const satSlider = document.getElementById('hsl-saturation');
+  const lightSlider = document.getElementById('hsl-lightness');
+  
+  const valHue = document.getElementById('val-hue');
+  const valSat = document.getElementById('val-saturation');
+  const valLight = document.getElementById('val-lightness');
+  
+  const hslPreview = document.getElementById('hsl-color-preview');
+  const hexInput = document.getElementById('user-color-hex');
+  
+  if (hueSlider) hueSlider.value = h;
+  if (satSlider) satSlider.value = s;
+  if (lightSlider) lightSlider.value = l;
+  
+  if (valHue) valHue.textContent = `${h}°`;
+  if (valSat) valSat.textContent = `${s}%`;
+  if (valLight) valLight.textContent = `${l}%`;
+  
+  const hexColor = hslToHex(h, s, l);
+  if (hexInput) hexInput.value = hexColor.toUpperCase();
+  if (hslPreview) hslPreview.style.backgroundColor = hexColor;
+}
+
+function setupHslListeners() {
+  const hueSlider = document.getElementById('hsl-hue');
+  const satSlider = document.getElementById('hsl-saturation');
+  const lightSlider = document.getElementById('hsl-lightness');
+  
+  const handler = () => {
+    const h = parseInt(hueSlider?.value || 0);
+    const s = parseInt(satSlider?.value || 100);
+    const l = parseInt(lightSlider?.value || 90);
+    updateHslUI(h, s, l);
+  };
+  
+  hueSlider?.addEventListener('input', handler);
+  satSlider?.addEventListener('input', handler);
+  lightSlider?.addEventListener('input', handler);
+
+  document.querySelectorAll('.modal-preset-color').forEach(btn => {
+    btn.addEventListener('click', () => {
+      const hex = btn.getAttribute('data-hex');
+      if (hex) {
+        const hsl = hexToHsl(hex);
+        updateHslUI(hsl.h, hsl.s, hsl.l);
+      }
+    });
+  });
+}
+
 async function handleAddCustomColor(e) {
   e.preventDefault();
 
@@ -338,14 +433,13 @@ async function handleAddCustomColor(e) {
   const color = hexInput?.value.trim();
 
   if (!/^#[0-9A-F]{6}$/i.test(color)) {
-    showToast('รหัสสีไม่ถูกต้อง รูปแบบต้องระบุเป็น #RRGGBB 🎨', 'error');
+    showToast('รหัสสีไม่ถูกต้อง 🎨', 'error');
     return;
   }
 
   const cleanColor = color.toLowerCase();
 
   if (editingColorIndex !== null) {
-    // Editing existing custom color
     customColors[editingColorIndex] = cleanColor;
     saveCustomColorsToDB();
 
@@ -353,7 +447,6 @@ async function handleAddCustomColor(e) {
     showToast('แก้ไขสีกระดาษเรียบร้อย! ✨', 'success');
     closeColorModal();
 
-    // Highlight the modified color swatch
     const modifiedIndex = editingColorIndex;
     editingColorIndex = null;
     
@@ -367,20 +460,18 @@ async function handleAddCustomColor(e) {
     }, 50);
 
   } else {
-    // Adding new custom color
     if (customColors.length >= 5) {
       showToast('บันทึกสีกำหนดเองได้สูงสุด 5 สีเท่านั้นครับ 🎨', 'warning');
       return;
     }
 
     customColors.push(cleanColor);
-    saveCustomColorsToDB(); // Instant update to localStorage and rendering
+    saveCustomColorsToDB();
 
     selectColor(cleanColor);
     showToast('บันทึกสีกำหนดเองเรียบร้อย! ✨', 'success');
     closeColorModal();
 
-    // Highlight the newly added color swatch
     setTimeout(() => {
       const swatches = document.querySelectorAll('.color-swatch');
       swatches.forEach(s => s.classList.remove('scale-110', 'ring-4', 'ring-pencil/30'));
@@ -400,11 +491,9 @@ function setupCustomizerEvents() {
   const cardArea = document.getElementById('capture-card-area');
   const patternOverlay = document.getElementById('paper-pattern-overlay');
   
-  // Show plus button immediately so users can add custom colors without delay
   const plusBtn = document.getElementById('btn-open-color-picker');
   if (plusBtn) plusBtn.classList.remove('hidden');
   
-  // 1. Preset Color Swatches click events
   const swatches = document.querySelectorAll('.color-swatch');
   swatches.forEach(swatch => {
     swatch.addEventListener('click', () => {
@@ -418,16 +507,14 @@ function setupCustomizerEvents() {
   
   if (swatches.length > 0) swatches[0].click();
 
-  // 1.5 Custom Colors UI & Modal Trigger setup
   const colorModal = document.getElementById('add-color-modal');
-  const colorPicker = document.getElementById('user-color-picker');
-  const colorHex = document.getElementById('user-color-hex');
   const openModalBtn = document.getElementById('btn-open-color-picker');
   const closeModalX = document.getElementById('btn-close-color-modal-x');
   const closeModalBtn = document.getElementById('btn-close-color-modal');
   const addColorForm = document.getElementById('add-color-form');
 
-  // Trigger modal open
+  setupHslListeners();
+
   openModalBtn?.addEventListener('click', () => {
     editingColorIndex = null;
     const modalTitle = document.getElementById('color-modal-title');
@@ -436,37 +523,25 @@ function setupCustomizerEvents() {
     if (modalTitle) modalTitle.textContent = '🎨 ผสมสีกระดาษใหม่';
     if (submitBtn) submitBtn.textContent = 'บันทึกสีนี้ 💾';
 
-    if (colorHex && colorPicker) {
-      colorPicker.value = '#FFFFFF';
-      colorHex.value = '#FFFFFF';
-    }
+    const defaultColor = '#fffefb';
+    const hsl = hexToHsl(defaultColor);
+    updateHslUI(hsl.h, hsl.s, hsl.l);
+    
     colorModal?.classList.remove('hidden');
   });
 
-  // Modal closing events
   closeModalX?.addEventListener('click', closeColorModal);
   closeModalBtn?.addEventListener('click', closeColorModal);
-
-  // Sync Color picker input and Hex text input
-  colorPicker?.addEventListener('input', (e) => {
-    if (colorHex) colorHex.value = e.target.value.toUpperCase();
-  });
-  
-  colorHex?.addEventListener('input', (e) => {
-    let val = e.target.value.trim();
-    if (val && !val.startsWith('#')) {
-      val = '#' + val;
-      colorHex.value = val;
-    }
-    if (/^#[0-9A-F]{6}$/i.test(val)) {
-      if (colorPicker) colorPicker.value = val;
-    }
-  });
-
-  // Add Custom Color Submission
   addColorForm?.addEventListener('submit', handleAddCustomColor);
 
-  // 2. Pattern Selectors
+  // Close Mobile Download modal listeners
+  document.getElementById('btn-close-mobile-download-x')?.addEventListener('click', () => {
+    document.getElementById('mobile-download-modal')?.classList.add('hidden');
+  });
+  document.getElementById('btn-close-mobile-download')?.addEventListener('click', () => {
+    document.getElementById('mobile-download-modal')?.classList.add('hidden');
+  });
+
   const patternBtns = document.querySelectorAll('.pattern-btn');
   patternBtns.forEach(btn => {
     btn.addEventListener('click', () => {
@@ -496,12 +571,10 @@ function setupCustomizerEvents() {
     });
   });
 
-  // 3. Download Action
   document.getElementById('btn-download-png')?.addEventListener('click', () => {
     downloadCardAsPNG();
   });
 
-  // 4. Back Button Action
   document.getElementById('btn-back-to-wish')?.addEventListener('click', () => {
     if (currentFestivalId) {
       navigate(`/message/${currentFestivalId}`);
@@ -534,11 +607,25 @@ function downloadCardAsPNG() {
       cardArea.style.transform = originalTransform;
       
       try {
+        const imgDataUrl = canvas.toDataURL('image/png');
+        const isMobile = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
+        
+        if (isMobile) {
+          const mobileModal = document.getElementById('mobile-download-modal');
+          const mobileImg = document.getElementById('mobile-download-img');
+          if (mobileModal && mobileImg) {
+            mobileImg.src = imgDataUrl;
+            mobileModal.classList.remove('hidden');
+            showToast('สร้างรูปภาพสำเร็จ! โปรดแตะค้างที่รูปเพื่อบันทึก 📱', 'success');
+            return;
+          }
+        }
+
         const link = document.createElement('a');
         const rawFestivalName = document.getElementById('card-festival-name')?.textContent || 'Festival';
         const cleanFestivalName = rawFestivalName.replace('🏷️ ', '').trim();
         link.download = `MyFestival-${cleanFestivalName}.png`;
-        link.href = canvas.toDataURL('image/png');
+        link.href = imgDataUrl;
         link.click();
         showToast('ดาวน์โหลดรูปภาพการ์ดอวยพรสำเร็จแล้ว! ✨', 'success');
       } catch (err) {
