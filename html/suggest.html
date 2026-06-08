@@ -37,8 +37,12 @@
 
         <!-- Image Upload -->
         <div class="flex flex-col gap-1">
-          <label for="suggest-image-input" class="font-bold text-sm">รูปภาพประกอบเทศกาล (ไม่บังคับ, แนะนำขนาด 800x533 px):</label>
-          <input type="file" id="suggest-image-input" accept="image/*" class="sketch-input w-full">
+          <label class="font-bold text-sm">รูปภาพประกอบเทศกาล (ไม่บังคับ, แนะนำขนาด 800x533 px):</label>
+          <label for="suggest-image-input" class="sketch-btn btn-cream cursor-pointer w-full flex items-center justify-center gap-2 py-3 border-2 border-pencil rounded-lg hover:bg-pencil-soft/30 transition-all text-center">
+            <span class="text-xl">📂</span>
+            <span id="suggest-file-label-text">คลิกเพื่อเลือกภาพประกอบ...</span>
+          </label>
+          <input type="file" id="suggest-image-input" accept="image/*" class="hidden">
           <div id="suggest-image-preview-container" class="hidden mt-2 border-2 border-pencil rounded-lg overflow-hidden max-w-xs relative bg-white">
             <img id="suggest-image-preview" class="w-full h-auto object-cover max-h-40" alt="ตัวอย่างภาพเทศกาล">
             <button type="button" id="btn-remove-suggest-image" class="absolute top-1 right-1 bg-wood-red border-2 border-pencil text-pencil font-bold text-xs rounded-full w-5 h-5 flex items-center justify-center shadow-[1px_1px_0px_0px_#4a3c31] cursor-pointer">×</button>
@@ -46,7 +50,7 @@
         </div>
 
         <!-- Date Range -->
-        <div class="grid grid-cols-2 gap-3">
+        <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
           <div class="flex flex-col gap-1">
             <label for="suggest-start-date" class="font-bold text-sm">วันเริ่มต้นเทศกาล:</label>
             <input type="text" id="suggest-start-date" required placeholder="เลือกวันเริ่มต้น" class="sketch-input w-full">
