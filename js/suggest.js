@@ -95,6 +95,7 @@ function setupDatePickers() {
 // Setup image compression and preview
 function setupImageHandler() {
   const fileInput = document.getElementById('suggest-image-input');
+  const fileLabelText = document.getElementById('suggest-file-label-text');
   const previewContainer = document.getElementById('suggest-image-preview-container');
   const previewImg = document.getElementById('suggest-image-preview');
   const btnRemoveImage = document.getElementById('btn-remove-suggest-image');
@@ -104,11 +105,14 @@ function setupImageHandler() {
     if (fileInput) fileInput.value = '';
     if (previewContainer) previewContainer.classList.add('hidden');
     if (previewImg) previewImg.src = '';
+    if (fileLabelText) fileLabelText.textContent = 'คลิกเพื่อเลือกภาพประกอบ...';
   };
   
   fileInput?.addEventListener('change', async (e) => {
     const file = e.target.files[0];
     if (!file) return;
+    
+    if (fileLabelText) fileLabelText.textContent = `📂 ${file.name}`;
     
     try {
       showToast('กำลังประมวลผลและบีบอัดรูปภาพ...', 'info');
