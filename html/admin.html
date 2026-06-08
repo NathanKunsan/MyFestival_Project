@@ -47,6 +47,9 @@
         <button id="tab-about" class="admin-tab sketch-btn btn-cream py-1 px-2.5 sm:py-1.5 sm:px-4 text-xs sm:text-sm md:text-base font-bold">
           📢 จัดการข่าวสาร/เกี่ยวกับ
         </button>
+        <button id="tab-chats" class="admin-tab sketch-btn btn-cream py-1 px-2.5 sm:py-1.5 sm:px-4 text-xs sm:text-sm md:text-base font-bold">
+          💬 แชทกับผู้ใช้
+        </button>
       </div>
 
       <!-- Content Containers -->
@@ -292,6 +295,35 @@
               <h2 class="text-xl font-extrabold mb-4 pb-2 border-b-2 border-pencil">📋 รายการข้อมูลข่าวสารทั้งหมดในระบบ</h2>
               <div id="admin-about-list" class="space-y-4">
                 <!-- Populated by JS -->
+              </div>
+            </div>
+          </div>
+        </div>
+        
+        <!-- Tab 7: Chat Hub -->
+        <div id="panel-chats" class="admin-panel hidden space-y-6">
+          <div class="sketch-card p-6 bg-white shadow-[4px_4px_0px_0px_#4a3c31] h-[600px] flex flex-col">
+            <h2 class="text-xl font-extrabold mb-4 pb-2 border-b-2 border-pencil flex items-center gap-2">
+              💬 แผงควบคุมแชทผู้ใช้งาน (Chat Hub)
+            </h2>
+            <div class="flex flex-grow overflow-hidden gap-4 h-[calc(100%-3.5rem)]">
+              <!-- Chat Users List (Left Column) -->
+              <div class="w-1/3 border-r-2 border-pencil pr-3 overflow-y-auto flex flex-col gap-2.5" id="chat-users-list">
+                <p class="text-pencil-light font-bold italic text-center py-6 text-sm">ไม่มีรายชื่อผู้ติดต่อ...</p>
+              </div>
+              
+              <!-- Chat Room (Right Column) -->
+              <div class="w-2/3 flex flex-col h-full relative" id="chat-room-container">
+                <!-- Active Chat Area -->
+                <div class="flex-grow overflow-y-auto p-4 bg-paper border-2 border-pencil rounded-lg mb-4 flex flex-col gap-3.5" id="admin-chat-messages">
+                  <p class="text-pencil-light font-bold italic text-center my-auto">เลือกผู้ติดต่อจากรายการทางด้านซ้ายเพื่อเปิดแชท...</p>
+                </div>
+                
+                <!-- Chat Input Form -->
+                <form id="admin-chat-input-form" class="flex gap-2 hidden">
+                  <input type="text" id="admin-chat-input" placeholder="พิมพ์ข้อความตอบกลับ..." class="sketch-input flex-grow py-2 px-4 text-sm" required autocomplete="off">
+                  <button type="submit" class="sketch-btn btn-green px-5 py-2 font-bold text-sm">ส่ง ✉</button>
+                </form>
               </div>
             </div>
           </div>
