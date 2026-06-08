@@ -239,9 +239,8 @@ select.sketch-input {
 
 /* Toast Messages */
 .sketch-toast {
-  position: fixed;
-  bottom: 24px;
-  right: 24px;
+  pointer-events: auto;
+  position: relative;
   z-index: 999;
   background-color: var(--color-card-bg);
   border: 3px solid var(--color-pencil);
@@ -256,7 +255,7 @@ select.sketch-input {
 
 @keyframes slideUp {
   from {
-    transform: translateY(100px) scale(0.9);
+    transform: translateY(20px) scale(0.95);
     opacity: 0;
   }
   to {
@@ -374,10 +373,12 @@ select.sketch-input {
 .flatpickr-current-month input.cur-year::-webkit-outer-spin-button,
 .flatpickr-current-month input.cur-year::-webkit-inner-spin-button {
   -webkit-appearance: none !important;
+  appearance: none !important;
   margin: 0 !important;
 }
 .flatpickr-current-month input.cur-year {
   -moz-appearance: textfield !important;
+  appearance: textfield !important;
 }
 
 /* Flatpickr Year Arrows Style */
@@ -546,6 +547,37 @@ span.flatpickr-weekday {
   box-shadow: 1px 1px 0px 0px var(--color-pencil) !important;
 }
 
+/* Mobile Hero Slider Buttons positioning */
+@media (max-width: 767px) {
+  #hero-section {
+    padding-bottom: 70px !important;
+  }
+  #slider-prev,
+  #slider-next {
+    position: absolute !important;
+    top: auto !important;
+    bottom: -60px !important;
+    transform: none !important;
+  }
+  #slider-prev {
+    left: 50% !important;
+    margin-left: -56px !important;
+  }
+  #slider-next {
+    right: 50% !important;
+    margin-right: -56px !important;
+  }
+  #slider-prev:hover,
+  #slider-next:hover {
+    transform: scale(1.05) !important;
+    background-color: #d2bc92 !important;
+  }
+  #slider-prev:active,
+  #slider-next:active {
+    transform: scale(0.95) !important;
+  }
+}
+
 /* Custom Card Paper Patterns */
 #paper-pattern-overlay {
   opacity: 0.45 !important;
@@ -603,3 +635,99 @@ span.flatpickr-weekday {
   border: none;
   border-radius: 50%;
 }
+
+/* Smooth Slider Transitions (Plan 2) */
+.slide-fade-in {
+  opacity: 1 !important;
+  transform: translateY(0) scale(1) rotate(0deg) !important;
+  transition: opacity 0.5s ease-out, transform 0.5s ease-out !important;
+}
+
+.slide-fade-out {
+  opacity: 0 !important;
+  transform: translateY(6px) scale(0.97) rotate(-0.5deg) !important;
+  transition: opacity 0.4s ease-in, transform 0.4s ease-in !important;
+}
+
+/* Toast FadeOut Animation */
+.toast-fadeOut {
+  animation: fadeOut 0.4s ease forwards !important;
+}
+
+@keyframes fadeOut {
+  from {
+    transform: translateY(0) scale(1);
+    opacity: 1;
+  }
+  to {
+    transform: translateY(20px) scale(0.9);
+    opacity: 0;
+  }
+}
+
+/* Floating Chat Widget & Conversation bubble styles (Plan 1) */
+.chat-bubble-sent {
+  background-color: var(--color-wood-green);
+  color: var(--color-pencil);
+  align-self: flex-end;
+  border: 2px solid var(--color-pencil);
+  border-radius: 18px 18px 4px 18px;
+  padding: 0.5rem 1rem;
+  max-width: 80%;
+  box-shadow: 2px 2px 0px 0px var(--color-pencil);
+  position: relative;
+  word-break: break-word;
+}
+
+.chat-bubble-received {
+  background-color: var(--color-paper);
+  color: var(--color-pencil);
+  align-self: flex-start;
+  border: 2px solid var(--color-pencil);
+  border-radius: 18px 18px 18px 4px;
+  padding: 0.5rem 1rem;
+  max-width: 80%;
+  box-shadow: 2px 2px 0px 0px var(--color-pencil);
+  position: relative;
+  word-break: break-word;
+}
+
+#chat-messages-list::-webkit-scrollbar {
+  width: 6px;
+}
+#chat-messages-list::-webkit-scrollbar-track {
+  background: transparent;
+}
+#chat-messages-list::-webkit-scrollbar-thumb {
+  background: var(--color-pencil-light);
+  border-radius: 4px;
+  border: none;
+}
+
+/* Custom Flex and Layouts for Chat (Plan 1) */
+.chat-header-container {
+  display: flex !important;
+  align-items: center !important;
+  gap: 10px !important;
+}
+
+.chat-avatar-circle {
+  flex-shrink: 0 !important;
+  width: 32px !important;
+  height: 32px !important;
+  border-radius: 50% !important;
+  border: 2px solid var(--color-pencil) !important;
+  background-color: white !important;
+  display: flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  font-size: 14px !important;
+}
+
+.chat-header-text {
+  display: flex !important;
+  flex-direction: column !important;
+  justify-content: center !important;
+}
+
+
