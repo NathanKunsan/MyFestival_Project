@@ -314,6 +314,28 @@ create policy "Allow admin full control on about_info"
         exists (select 1 from public.profiles where id = auth.uid() and role = 'admin')
     );
 
+-- 16.5. CHAT MESSAGES POLICIES
+alter table public.chat_messages enable row level security;
+
+drop policy if exists "Allow users to send chat messages" on public.chat_messages;
+create policy "Allow users to send chat messages"
+    on public.chat_messages for insert
+    to authenticated
+    with check (auth.uid() = sender_id);
+
+drop policy if exists "Allow users to read their own chats" on public.chat_messages;
+create policy "Allow users to read their own chats"
+    on public.chat_messages for select
+    to authenticated
+    using (auth.uid() = sender_id or auth.uid() = receiver_id);
+
+drop policy if exists "Allow receivers to update read status" on public.chat_messages;
+create policy "Allow receivers to update read status"
+    on public.chat_messages for update
+    to authenticated
+    using (auth.uid() = receiver_id)
+    with check (auth.uid() = receiver_id);
+
 -- 17. ENABLE REAL-TIME FOR ALL APP TABLES
 drop publication if exists supabase_realtime;
-create publication supabase_realtime for table profiles, messages, message_revisions, reports, festivals, notifications, festival_suggestions, about_info;
+create publication supabase_realtime for table profiles, messages, message_revisions, reports, festivals, notifications, festival_suggestions, about_info, chat_messages;
