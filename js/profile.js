@@ -5,6 +5,7 @@ import { showToast, navigate, refreshAuthUI } from './router.js';
 
 let currentUserId = null;
 let userProfile = null;
+let notificationSubscription = null;
 
 // Initialize Profile View
 export const init = async () => {
@@ -20,6 +21,7 @@ export const init = async () => {
   setupFormSubmit();
   await loadNotifications();
   setupNotificationEvents();
+  subscribeNotifications();
 };
 
 // Fetch and load profile data into form elements
@@ -73,7 +75,7 @@ async function loadProfileData(user) {
       if (roleSection) roleSection.classList.remove('hidden');
       
       // Admin Mode: allow switching between all 3 roles for developer view simulation
-      roleContainer.className = "grid grid-cols-3 gap-3";
+      roleContainer.className = "grid grid-cols-1 sm:grid-cols-3 gap-3";
       
       let adminRadio = roleContainer.querySelector('input[value="admin"]');
       if (!adminRadio) {
@@ -339,3 +341,34 @@ function setupNotificationEvents() {
     }
   });
 }
+
+async function subscribeNotifications() {
+  if (notificationSubscription) {
+    notificationSubscription.unsubscribe();
+    notificationSubscription = null;
+  }
+
+  const supabase = await getSupabase();
+  if (!supabase || !currentUserId) return;
+
+  notificationSubscription = supabase
+    .channel('public:notifications')
+    .on('postgres_changes', {
+      event: '*',
+      schema: 'public',
+      table: 'notifications',
+      filter: `user_id=eq.${currentUserId}`
+    }, async (payload) => {
+      console.log('Realtime notification change detected:', payload);
+      await loadNotifications();
+    })
+    .subscribe();
+}
+
+export const cleanup = () => {
+  if (notificationSubscription) {
+    notificationSubscription.unsubscribe();
+    notificationSubscription = null;
+  }
+  console.log('Cleaning up profile controller...');
+};
