@@ -18,6 +18,7 @@ drop table if exists festivals cascade;
 drop table if exists profiles cascade;
 drop table if exists festival_suggestions cascade;
 drop table if exists about_info cascade;
+drop table if exists chat_messages cascade;
 
 -- 1. PROFILES Table (Extends auth.users)
 create table profiles (
@@ -163,6 +164,16 @@ create table if not exists about_info (
     sort_order integer default 0,
     created_at timestamp with time zone default now() not null,
     updated_at timestamp with time zone default now() not null
+);
+
+-- 14. CHAT MESSAGES Table
+create table chat_messages (
+    id uuid primary key default gen_random_uuid(),
+    sender_id uuid not null references profiles(id) on delete cascade,
+    receiver_id uuid not null references profiles(id) on delete cascade,
+    message text not null check (char_length(message) > 0),
+    is_read boolean default false not null,
+    created_at timestamp with time zone default now() not null
 );
 
 -- COMMON TRIGGERS FOR updated_at
