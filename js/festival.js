@@ -1,476 +1,108 @@
-// MyFestival - Festival Timeline Controller
-import { getSupabase } from './supabase.js';
-import { navigate, showToast } from './router.js';
-import { getCurrentUser, getUserProfile } from './auth.js';
+<!DOCTYPE html>
+<html lang="th">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>MyFestival</title>
+  <!-- Supabase CDN -->
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <!-- Tailwind CSS CDN -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  <!-- Custom Sketchbook CSS -->
+  <link rel="stylesheet" href="/css/style.css">
+</head>
+<body class="bg-paper text-pencil paper-grain p-4">
 
-let festivalsData = [];
-let currentSliderIndex = 0;
-let messagesSubscription = null;
-let festivalsSubscription = null;
-let isInitialLoad = true;
-let userRole = 'guest';
-let sliderInterval = null;
+  <div id="page-content" class="w-full max-w-6xl mx-auto py-6">
+    <div class="space-y-12">
 
-// Initialize Festival Page
-export const init = async () => {
-  const supabase = await getSupabase();
-  if (!supabase) return;
-  
-  const user = await getCurrentUser();
-  if (user) {
-    const profile = await getUserProfile(user.id);
-    userRole = profile?.role || 'member';
-  } else {
-    userRole = 'guest';
-  }
-  
-  await fetchAndRenderFestivals(supabase);
-  setupSliderEvents();
-  setupRealtime(supabase);
-  setupGlobalLockEvents();
-  startSliderAutoPlay();
-};
-
-function setupGlobalLockEvents() {
-  const mainEl = document.getElementById('main-content');
-  if (mainEl && !mainEl.dataset.lockListenersBound) {
-    mainEl.dataset.lockListenersBound = 'true';
-    mainEl.addEventListener('click', (e) => {
-      const upcomingBtn = e.target.closest('.btn-upcoming-lock');
-      const endedBtn = e.target.closest('.btn-ended-lock');
+      <!-- Welcome Hero Info Card -->
+      <section id="welcome-section" class="max-w-4xl mx-auto">
+        <div class="sketch-card p-6 md:p-8 bg-paper paper-grain shadow-[4px_4px_0px_0px_#4a3c31] border-2 border-pencil rounded-xl relative hover-wiggle">
+          <div class="flex flex-col md:flex-row gap-6 items-center">
+            <div class="text-5xl md:text-6xl select-none">✏️</div>
+            <div class="space-y-3 text-center md:text-left">
+              <h2 class="text-2xl md:text-3xl font-black text-pencil">
+                ยินดีต้อนรับสู่ <span class="scribble-highlight">MyFestival</span> !
+              </h2>
+              <p class="text-base text-pencil-light font-bold leading-relaxed">
+                พื้นที่สมุดบันทึกสีไม้และกระดาษเขียนมือสำหรับร่วมส่งต่อความรู้สึกดีๆ และสุ่มการ์ดคำอวยพรสุดอบอุ่นในเทศกาลและประเพณีไทยต่างๆ 
+                คุณสามารถสุ่มอ่านคำอวยพรมงคลตามเทศกาล ตกแต่งการ์ดภาพในธีมของเล่นสีไม้ หรือร่วมเสนองานเทศกาลประเพณีใหม่ๆ ของบ้านคุณมาแบ่งปันกันได้เลย!
+              </p>
+              <div class="flex flex-wrap gap-2 justify-center md:justify-start pt-1">
+                <span class="sketch-badge btn-yellow text-xs">🎲 สุ่มการ์ดรับพร</span>
+                <span class="sketch-badge btn-blue text-xs">🎨 ตกแต่งการ์ดส่งต่อ</span>
+                <span class="sketch-badge btn-orange text-xs">🎡 เสนอชื่อประเพณีใหม่</span>
+              </div>
+            </div>
+          </div>
+        </div>
+      </section>
       
-      if (upcomingBtn) {
-        e.preventDefault();
-        showToast('เทศกาลนี้ยังไม่เริ่มจัดงาน ไม่สามารถสุ่มคำอวยพรได้ครับ ⏳', 'warning');
-      } else if (endedBtn) {
-        e.preventDefault();
-        showToast('เทศกาลนี้ได้สิ้นสุดลงแล้ว ไม่สามารถสุ่มคำอวยพรได้ครับ 💾', 'warning');
-      }
-    });
-  }
-}
+      <!-- Hero Festival Section -->
+      <section id="hero-section" class="relative">
+        <h1 class="text-3xl md:text-4xl font-extrabold text-center mb-6 hover-wiggle">
+          🎯 <span class="scribble-highlight">เทศกาลแนะนำในตอนนี้</span>
+        </h1>
+        
+        <!-- Hero Slider Container -->
+        <div class="relative max-w-4xl mx-auto px-4">
+          <!-- Left Arrow -->
+          <button id="slider-prev" class="absolute left-0 top-1/2 -translate-y-1/2 z-10 sketch-btn btn-cream w-12 h-12 rounded-full flex items-center justify-center text-xl font-bold shadow-[2px_2px_0px_0px_#4a3c31]">
+            &lt;
+          </button>
+          
+          <!-- Slide Content -->
+          <div id="hero-slider" class="sketch-card p-6 md:p-8 bg-white max-w-3xl mx-auto min-h-[350px] flex flex-col md:flex-row gap-6 items-center">
+            <!-- Loader / Content injected by JS -->
+            <div class="w-full text-center py-12">
+              <p class="text-xl font-bold animate-pulse">✏️ กำลังเปิดบันทึกเทศกาลแนะนำ...</p>
+            </div>
+          </div>
+          
+          <!-- Right Arrow -->
+          <button id="slider-next" class="absolute right-0 top-1/2 -translate-y-1/2 z-10 sketch-btn btn-cream w-12 h-12 rounded-full flex items-center justify-center text-xl font-bold shadow-[2px_2px_0px_0px_#4a3c31]">
+            &gt;
+          </button>
+        </div>
+      </section>
 
-// Helper for mock festivals data fallback
-const getMockFestivals = () => {
-  const now = new Date();
-  
-  // Make Songkran active right now for demonstration
-  const songkranStart = new Date(now);
-  songkranStart.setDate(now.getDate() - 3);
-  const songkranEnd = new Date(now);
-  songkranEnd.setDate(now.getDate() + 5);
-  
-  // Make Loy Krathong upcoming
-  const loyStart = new Date(now);
-  loyStart.setDate(now.getDate() + 15);
-  const loyEnd = new Date(now);
-  loyEnd.setDate(now.getDate() + 25);
-  
-  // Make New Year ended
-  const nyStart = new Date(now);
-  nyStart.setDate(now.getDate() - 25);
-  const nyEnd = new Date(now);
-  nyEnd.setDate(now.getDate() - 15);
-
-  return [
-    {
-      id: "f1111111-1111-1111-1111-111111111111",
-      name: "เทศกาลสงกรานต์ (Songkran Festival)",
-      description: "เทศกาลขึ้นปีใหม่ไทยอันแสนอบอุ่น ร่วมสืบสานประเพณีรดน้ำดำหัวผู้ใหญ่ เล่นน้ำสงกรานต์กันอย่างสนุกสนาน และส่งต่อคำอวยพรดีๆ ให้กัน",
-      image_url: "https://images.unsplash.com/photo-1582880786584-c5a45b85a3c0?w=800",
-      start_date: songkranStart.toISOString(),
-      end_date: songkranEnd.toISOString(),
-      messages: [
-        { id: "m1", status: "approved" },
-        { id: "m2", status: "approved" },
-        { id: "m3", status: "approved" }
-      ]
-    },
-    {
-      id: "f2222222-2222-2222-2222-222222222222",
-      name: "เทศกาลลอยกระทง (Loy Krathong)",
-      description: "ประเพณีลอยกระทงเพื่อขอขมาพระแม่คงคาในคืนวันเพ็ญเดือนสิบสอง ร่วมลอยกระทงประทีปโคมไฟ และขอพรส่งต่อความรักสุขใจ",
-      image_url: "https://images.unsplash.com/photo-1544644181-1484b3fdfc62?w=800",
-      start_date: loyStart.toISOString(),
-      end_date: loyEnd.toISOString(),
-      messages: [
-        { id: "m4", status: "approved" },
-        { id: "m5", status: "approved" }
-      ]
-    },
-    {
-      id: "f3333333-3333-3333-3333-333333333333",
-      name: "เทศกาลปีใหม่ (New Year Celebration)",
-      description: "เฉลิมฉลองเทศกาลส่งท้ายปีเก่าต้อนรับปีใหม่ ร่วมเคาท์ดาวน์สวดมนต์ข้ามปี และตั้งปณิธานส่งมอบความหวังกำลังใจให้กันและกัน",
-      image_url: "https://images.unsplash.com/photo-1512909006721-3d6018887383?w=800",
-      start_date: nyStart.toISOString(),
-      end_date: nyEnd.toISOString(),
-      messages: [
-        { id: "m6", status: "approved" }
-      ]
-    }
-  ];
-};
-
-// Fetch all festivals and count messages
-async function fetchAndRenderFestivals(supabase) {
-  try {
-    // Fetch festivals along with message references
-    const { data, error } = await supabase
-      .from('festivals')
-      .select('*, messages(id, status)');
-      
-    if (error) throw error;
-    
-    festivalsData = data || [];
-    
-    // Sort festivals by start_date
-    festivalsData.sort((a, b) => new Date(a.start_date) - new Date(b.start_date));
-    
-    renderCategories();
-    renderHeroSlider();
-  } catch (error) {
-    console.warn('Error fetching festivals, falling back to mock data:', error.message);
-    festivalsData = getMockFestivals();
-    
-    renderCategories();
-    renderHeroSlider();
-  }
-}
-
-// Render Categorized Sections (Active, Upcoming, Ended)
-function renderCategories() {
-  const now = new Date();
-  
-  const activeList = document.getElementById('active-list');
-  const upcomingList = document.getElementById('upcoming-list');
-  const endedList = document.getElementById('ended-list');
-  
-  if (!activeList || !upcomingList || !endedList) return;
-  
-  // Clear lists
-  activeList.innerHTML = '';
-  upcomingList.innerHTML = '';
-  endedList.innerHTML = '';
-  
-  let activeCount = 0;
-  let upcomingCount = 0;
-  let endedCount = 0;
-  
-  festivalsData.forEach(festival => {
-    const startDate = new Date(festival.start_date);
-    const endDate = new Date(festival.end_date);
-    const approvedCount = festival.messages.filter(m => m.status === 'approved').length;
-    
-    const cardHtml = createFestivalCard(festival, approvedCount);
-    
-    if (startDate <= now && endDate >= now) {
-      activeList.innerHTML += cardHtml;
-      activeCount++;
-    } else if (startDate > now) {
-      upcomingList.innerHTML += cardHtml;
-      upcomingCount++;
-    } else {
-      endedList.innerHTML += cardHtml;
-      endedCount++;
-    }
-  });
-  
-  // Fallbacks if groups are empty
-  if (activeCount === 0) {
-    activeList.innerHTML = `<p class="text-pencil-light font-bold italic col-span-full py-4 text-center">ไม่มีเทศกาลที่กำลังดำเนินอยู่ในขณะนี้... 🍃</p>`;
-  }
-  if (upcomingCount === 0) {
-    upcomingList.innerHTML = `<p class="text-pencil-light font-bold italic col-span-full py-4 text-center">ไม่มีเทศกาลที่กำลังจะมาถึงในขณะนี้... 📅</p>`;
-  }
-  if (endedCount === 0) {
-    endedList.innerHTML = `<p class="text-pencil-light font-bold italic col-span-full py-4 text-center">ไม่มีเทศกาลที่จบการบันทึกแล้ว... 💾</p>`;
-  }
-
-}
-
-// Helper to create a single card
-function createFestivalCard(festival, approvedCount) {
-  const startStr = formatDate(festival.start_date);
-  const endStr = formatDate(festival.end_date);
-  
-  // Pick border/bg color based on ID to make the screen look colorful like colored pencils
-  const colors = ['btn-yellow', 'btn-green', 'btn-blue', 'btn-pink', 'btn-purple', 'btn-orange'];
-  const colorIndex = Math.abs(hashCode(festival.id)) % colors.length;
-  const cardColorClass = colors[colorIndex];
-  
-  return `
-    <div class="sketch-card p-4 bg-white flex flex-col justify-between min-h-[300px]">
-      <div>
-        <div class="relative h-40 w-full mb-3 rounded-lg overflow-hidden border-2 border-pencil">
-          <img src="${festival.image_url || 'https://images.unsplash.com/photo-1513151233558-d860c5398176?w=600'}" 
-               alt="${festival.name}" 
-               class="w-full h-full object-cover">
-          <div class="absolute bottom-2 right-2 sketch-badge ${cardColorClass}">
-            💌 ${approvedCount} คำอวยพร
+      <!-- Categorized Festivals -->
+      <section class="space-y-10">
+        
+        <!-- 1. Active Festivals -->
+        <div id="active-group" class="space-y-4">
+          <h2 class="text-2xl font-extrabold flex items-center gap-2 border-b-2 border-pencil pb-2">
+            🟢 เทศกาลที่กำลังดำเนินอยู่ (Active)
+          </h2>
+          <div id="active-list" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+            <p class="text-pencil-light font-bold italic col-span-full py-4">ไม่มีเทศกาลที่กำลังดำเนินอยู่ในขณะนี้...</p>
           </div>
         </div>
         
-        <h3 class="text-xl font-extrabold mb-1">${festival.name}</h3>
-        <p class="text-xs text-pencil-light font-bold mb-2">🗓️ ${startStr} - ${endStr}</p>
-        <p class="text-sm line-clamp-3">${festival.description || 'ไม่มีคำอธิบายเพิ่มเติม'}</p>
-      </div>
-      
-      <div class="mt-4 pt-3 border-t-2 border-pencil-soft flex gap-2">
-        ${new Date(festival.start_date) > new Date()
-          ? `<button class="sketch-btn btn-cream text-sm flex-1 text-center py-1.5 justify-center opacity-60 btn-upcoming-lock">
-               ⏳ ยังไม่เริ่มจัดงาน
-             </button>`
-          : new Date(festival.end_date) < new Date()
-            ? `<button class="sketch-btn btn-cream text-sm flex-1 text-center py-1.5 justify-center opacity-60 btn-ended-lock">
-                 💾 สิ้นสุดเทศกาลแล้ว
-               </button>`
-            : `<a href="/message/${festival.id}" class="sketch-btn btn-yellow text-sm flex-1 text-center py-1.5 justify-center">
-                 🎲 สุ่มรับคำอวยพร
-               </a>`
-        }
-      </div>
+        <!-- 2. Upcoming Festivals -->
+        <div id="upcoming-group" class="space-y-4">
+          <h2 class="text-2xl font-extrabold flex items-center gap-2 border-b-2 border-pencil pb-2">
+            📅 เทศกาลเร็วๆ นี้ (Upcoming)
+          </h2>
+          <div id="upcoming-list" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+            <p class="text-pencil-light font-bold italic col-span-full py-4">ไม่มีเทศกาลที่กำลังจะมาถึงในขณะนี้...</p>
+          </div>
+        </div>
+        
+        <!-- 3. Ended Festivals -->
+        <div id="ended-group" class="space-y-4">
+          <h2 class="text-2xl font-extrabold flex items-center gap-2 border-b-2 border-pencil pb-2">
+            💾 เทศกาลที่จบแล้ว (Ended / Archives)
+          </h2>
+          <div id="ended-list" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+            <p class="text-pencil-light font-bold italic col-span-full py-4">ไม่มีเทศกาลที่จบแล้วในขณะนี้...</p>
+          </div>
+        </div>
+        
+      </section>
     </div>
-  `;
-}
+  </div>
 
-// Render Hero Slider Content
-function renderHeroSlider() {
-  const heroSlider = document.getElementById('hero-slider');
-  if (!heroSlider || festivalsData.length === 0) return;
-  
-  if (isInitialLoad) {
-    // Find current active festival, or default to first
-    const now = new Date();
-    const activeIndex = festivalsData.findIndex(f => new Date(f.start_date) <= now && new Date(f.end_date) >= now);
-    
-    if (activeIndex !== -1) {
-      currentSliderIndex = activeIndex;
-    }
-    isInitialLoad = false;
-  } else if (currentSliderIndex >= festivalsData.length) {
-    currentSliderIndex = 0;
-  }
-  
-  updateSliderContent();
-}
-
-// Update the DOM for the active slide in the Hero
-// Update the DOM for the active slide in the Hero with smooth transition (Plan 2)
-function updateSliderContent() {
-  const heroSlider = document.getElementById('hero-slider');
-  if (!heroSlider || festivalsData.length === 0) return;
-  
-  // Fade out
-  heroSlider.classList.remove('slide-fade-in');
-  heroSlider.classList.add('slide-fade-out');
-  
-  setTimeout(() => {
-    const festival = festivalsData[currentSliderIndex];
-    const approvedCount = festival.messages.filter(m => m.status === 'approved').length;
-    const startStr = formatDate(festival.start_date);
-    const endStr = formatDate(festival.end_date);
-    
-    const now = new Date();
-    const isActive = new Date(festival.start_date) <= now && new Date(festival.end_date) >= now;
-    const isUpcoming = new Date(festival.start_date) > now;
-    
-    let statusBadge = '';
-    if (isActive) {
-      statusBadge = '<span class="sketch-badge btn-green text-xs font-extrabold">🔴 กำลังจัดขึ้น</span>';
-    } else if (isUpcoming) {
-      statusBadge = '<span class="sketch-badge btn-orange text-xs font-extrabold">📅 เร็วๆ นี้</span>';
-    } else {
-      statusBadge = '<span class="sketch-badge btn-cream text-xs font-extrabold">💾 ผ่านไปแล้ว</span>';
-    }
-    
-    heroSlider.innerHTML = `
-      <!-- Slider Left: polaroid photo -->
-      <div class="w-full md:w-1/2 flex justify-center">
-        <div class="sketch-card sketch-card-alt p-3 bg-white rotate-[-1deg] max-w-sm">
-          <div class="w-full aspect-[4/3] rounded border-2 border-pencil overflow-hidden mb-3">
-            <img src="${festival.image_url || 'https://images.unsplash.com/photo-1513151233558-d860c5398176?w=800'}" 
-                 alt="${festival.name}" 
-                 class="w-full h-full object-cover">
-          </div>
-          <div class="text-center font-bold text-lg">${festival.name}</div>
-        </div>
-      </div>
-      
-      <!-- Slider Right: details & call to actions -->
-      <div class="w-full md:w-1/2 space-y-4">
-        <div class="flex items-center gap-2">
-          ${statusBadge}
-          <span class="sketch-badge btn-yellow text-xs font-extrabold">💌 ${approvedCount} คำอวยพร</span>
-        </div>
-        
-        <h2 class="text-3xl font-extrabold">${festival.name}</h2>
-        <p class="text-sm font-bold text-pencil-light">
-          🗓️ ${startStr} - ${endStr}
-        </p>
-        
-        <p class="text-base text-pencil-light">
-          ${festival.description || 'เชิญร่วมสุ่มเปิดรับการ์ดอวยพรหรือฝากคำอวยพรเพื่อส่งต่อความสุขให้เพื่อนพ้องพี่น้องชาวไทยได้เลย!'}
-        </p>
-        
-        <div class="pt-4 flex flex-wrap gap-2">
-          ${isUpcoming
-            ? `<button class="sketch-btn btn-cream py-2.5 px-6 opacity-60 text-lg btn-upcoming-lock">
-                 ⏳ ยังไม่เริ่ม
-               </button>`
-            : new Date(festival.end_date) < now
-              ? `<button class="sketch-btn btn-cream py-2.5 px-6 opacity-60 text-lg btn-ended-lock">
-                   💾 สิ้นสุดเทศกาลแล้ว
-                 </button>`
-              : `<a href="/message/${festival.id}" class="sketch-btn btn-yellow text-lg py-2.5 px-6">
-                   🎲 สุ่มคำอวยพร
-                 </a>`
-          }
-          ${(['contributor', 'admin'].includes(userRole) || localStorage.getItem('myfestival_dev_bypass') === 'true')
-            ? `<a href="/contributor" class="sketch-btn btn-cream py-2.5 px-6">
-                 ✍️ ส่งคำอวยพร
-               </a>`
-            : ''
-          }
-        </div>
-      </div>
-    `;
-    
-    // Trigger reflow to apply transition
-    void heroSlider.offsetWidth;
-    heroSlider.classList.remove('slide-fade-out');
-    heroSlider.classList.add('slide-fade-in');
-  }, 400); // 400ms transition delay
-}
-
-// Setup navigation triggers for the Hero Slider
-function setupSliderEvents() {
-  const prevBtn = document.getElementById('slider-prev');
-  const nextBtn = document.getElementById('slider-next');
-  
-  prevBtn?.addEventListener('click', () => {
-    if (festivalsData.length === 0) return;
-    currentSliderIndex = (currentSliderIndex - 1 + festivalsData.length) % festivalsData.length;
-    updateSliderContent();
-    startSliderAutoPlay(); // Reset timer
-  });
-  
-  nextBtn?.addEventListener('click', () => {
-    if (festivalsData.length === 0) return;
-    currentSliderIndex = (currentSliderIndex + 1) % festivalsData.length;
-    updateSliderContent();
-    startSliderAutoPlay(); // Reset timer
-  });
-
-  // Touch swipe events for mobile support
-  const heroSlider = document.getElementById('hero-slider');
-  if (heroSlider) {
-    let touchStartX = 0;
-    let touchEndX = 0;
-    
-    heroSlider.addEventListener('touchstart', (e) => {
-      touchStartX = e.changedTouches[0].screenX;
-    }, { passive: true });
-    
-    heroSlider.addEventListener('touchend', (e) => {
-      touchEndX = e.changedTouches[0].screenX;
-      handleSwipe();
-    }, { passive: true });
-    
-    function handleSwipe() {
-      const swipeDistance = touchEndX - touchStartX;
-      if (swipeDistance < -50) {
-        // Swipe left -> Next slide
-        if (festivalsData.length === 0) return;
-        currentSliderIndex = (currentSliderIndex + 1) % festivalsData.length;
-        updateSliderContent();
-        startSliderAutoPlay(); // Reset timer
-      } else if (swipeDistance > 50) {
-        // Swipe right -> Prev slide
-        if (festivalsData.length === 0) return;
-        currentSliderIndex = (currentSliderIndex - 1 + festivalsData.length) % festivalsData.length;
-        updateSliderContent();
-        startSliderAutoPlay(); // Reset timer
-      }
-    }
-  }
-}
-
-// Autoplay slider logic
-function startSliderAutoPlay() {
-  stopSliderAutoPlay();
-  sliderInterval = setInterval(() => {
-    if (festivalsData.length === 0) return;
-    currentSliderIndex = (currentSliderIndex + 1) % festivalsData.length;
-    updateSliderContent();
-  }, 8000); // Rotate every 8 seconds
-}
-
-function stopSliderAutoPlay() {
-  if (sliderInterval) {
-    clearInterval(sliderInterval);
-    sliderInterval = null;
-  }
-}
-
-// Date Formatting Helper
-function formatDate(dateStr) {
-  const date = new Date(dateStr);
-  return date.toLocaleDateString('th-TH', {
-    day: 'numeric',
-    month: 'short',
-    year: 'numeric'
-  });
-}
-
-// Simple hash generator for unique indices
-function hashCode(str) {
-  let hash = 0;
-  for (let i = 0; i < str.length; i++) {
-    hash = str.charCodeAt(i) + ((hash << 5) - hash);
-  }
-  return hash;
-}
-
-function setupRealtime(supabase) {
-  // Subscribe to messages changes to update counts in real-time
-  if (messagesSubscription) messagesSubscription.unsubscribe();
-  messagesSubscription = supabase
-    .channel('festival-messages-changes')
-    .on(
-      'postgres_changes',
-      { event: '*', schema: 'public', table: 'messages' },
-      async (payload) => {
-        console.log('Messages change detected in homepage:', payload);
-        await fetchAndRenderFestivals(supabase);
-      }
-    )
-    .subscribe();
-
-  // Subscribe to festivals changes
-  if (festivalsSubscription) festivalsSubscription.unsubscribe();
-  festivalsSubscription = supabase
-    .channel('festival-festivals-changes')
-    .on(
-      'postgres_changes',
-      { event: '*', schema: 'public', table: 'festivals' },
-      async (payload) => {
-        console.log('Festivals change detected in homepage:', payload);
-        await fetchAndRenderFestivals(supabase);
-      }
-    )
-    .subscribe();
-}
-
-export const cleanup = () => {
-  stopSliderAutoPlay();
-  if (messagesSubscription) {
-    messagesSubscription.unsubscribe();
-    messagesSubscription = null;
-  }
-  if (festivalsSubscription) {
-    festivalsSubscription.unsubscribe();
-    festivalsSubscription = null;
-  }
-  isInitialLoad = true;
-};
+</body>
+</html>
