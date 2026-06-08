@@ -270,7 +270,7 @@ async function renderMessageCard() {
           </div>
           
           <!-- User Interactions -->
-          <div class="flex items-center gap-2">
+          <div class="flex flex-wrap items-center justify-center sm:justify-end gap-2 w-full sm:w-auto">
             <!-- Like Button -->
             <button id="btn-like-msg" class="sketch-btn ${isLiked ? 'btn-red' : 'btn-cream'} py-1.5 px-3.5 text-sm flex items-center gap-1.5">
               <span>${isLiked ? '❤️' : '🤍'}</span>
@@ -414,6 +414,11 @@ function setupInteractiveEvents() {
   // 2. Copy Share Link
   document.getElementById('btn-copy-link')?.addEventListener('click', async () => {
     if (!currentMessage) return;
+    if (!currentUserId) {
+      showToast('กรุณาเข้าสู่ระบบก่อนคัดลอกลิงก์แชร์คำอวยพร 🔒', 'warning');
+      setTimeout(() => navigate('/login'), 1500);
+      return;
+    }
 
     const shareUrl = `${window.location.origin}/#/message/${currentMessage.id}`;
 
@@ -430,6 +435,11 @@ function setupInteractiveEvents() {
   // 3. Download Card as PNG Image
   document.getElementById('btn-download-card')?.addEventListener('click', () => {
     if (!currentMessage) return;
+    if (!currentUserId) {
+      showToast('กรุณาเข้าสู่ระบบก่อนดาวน์โหลดการ์ดคำอวยพร 🔒', 'warning');
+      setTimeout(() => navigate('/login'), 1500);
+      return;
+    }
     try {
       sessionStorage.setItem('active_wish_download', JSON.stringify({
         ...currentMessage,
@@ -572,3 +582,4 @@ function renderEmptyState() {
     `;
   }
 }
+
