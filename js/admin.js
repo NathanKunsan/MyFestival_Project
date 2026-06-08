@@ -15,6 +15,7 @@ let notificationsSubscription = null;
 let suggestionsSubscription = null;
 let currentFestivalImageUrl = null;
 let aboutSubscription = null;
+let chatSubscription = null;
 
 
 // Initial Mock Data Fallbacks
@@ -211,6 +212,7 @@ export const init = async () => {
   setupRequestEditModal();
   setupDeleteReasonModal();
   setupAboutForm();
+  setupChatHubEvents();
   
   // Subscribe to realtime changes on database tables to keep lists updated
   const supabase = await getSupabase();
@@ -400,6 +402,9 @@ function setupTabNavigation() {
       } else if (targetId === 'tab-about') {
         document.getElementById('panel-about').classList.remove('hidden');
         await loadAboutTab();
+      } else if (targetId === 'tab-chats') {
+        document.getElementById('panel-chats').classList.remove('hidden');
+        await loadChatsTab();
       }
     });
   });
@@ -2951,6 +2956,345 @@ function setupAboutForm() {
   });
 }
 
+// --- ADMIN CHAT HUB CONTROLLER (PLAN 1) ---
+let activeChatUserId = null;
+let useMockChat = false;
+
+async function loadChatsTab() {
+  const supabase = await getSupabase();
+  activeChatUserId = null;
+  const chatMessagesEl = document.getElementById('admin-chat-messages');
+  if (chatMessagesEl) {
+    chatMessagesEl.innerHTML = `
+      <p class="text-pencil-light font-bold italic text-center my-auto">เลือกผู้ติดต่อจากรายการทางด้านซ้ายเพื่อเปิดแชท...</p>
+    `;
+  }
+  const chatForm = document.getElementById('admin-chat-input-form');
+  if (chatForm) chatForm.classList.add('hidden');
+  
+  if (!supabase) {
+    useMockChat = true;
+    await loadMockChats();
+    return;
+  }
+  
+  try {
+    const { error: testError } = await supabase.from('chat_messages').select('id').limit(1);
+    if (testError) {
+      useMockChat = true;
+      await loadMockChats();
+      return;
+    }
+    
+    useMockChat = false;
+    await loadRealChats(supabase);
+  } catch (err) {
+    useMockChat = true;
+    await loadMockChats();
+  }
+}
+
+async function loadRealChats(supabase) {
+  try {
+    const { data: messages, error } = await supabase
+      .from('chat_messages')
+      .select('*')
+      .or(`sender_id.eq.${currentUserId},receiver_id.eq.${currentUserId}`)
+      .order('created_at', { ascending: false });
+      
+    if (error) throw error;
+    
+    const userIds = [...new Set(messages.map(m => m.sender_id === currentUserId ? m.receiver_id : m.sender_id))];
+    
+    let chatUsers = [];
+    if (userIds.length > 0) {
+      const { data: profiles, error: pError } = await supabase
+        .from('profiles')
+        .select('*')
+        .in('id', userIds);
+      if (!pError && profiles) {
+        chatUsers = profiles;
+      }
+    }
+    
+    renderChatUsers(chatUsers, messages);
+    setupChatRealtime(supabase);
+  } catch (err) {
+    console.error('Error loading real chats:', err);
+    showToast('เกิดข้อผิดพลาดในการโหลดข้อความแชท', 'error');
+  }
+}
+
+async function loadMockChats() {
+  const mockUsers = [
+    { id: 'mock-user-1', full_name: 'สมชาย รักเรียน', email: 'somchai@gmail.com', avatar_url: 'https://api.dicebear.com/7.x/fun-emoji/svg?seed=somchai' },
+    { id: 'mock-user-2', full_name: 'น้องคริส', email: 'chris@example.com', avatar_url: 'https://api.dicebear.com/7.x/fun-emoji/svg?seed=chris' }
+  ];
+  
+  const rawMsg = localStorage.getItem('myfestival_mock_chat_messages');
+  let messages = [];
+  if (rawMsg) {
+    try { messages = JSON.parse(rawMsg); } catch(e) {}
+  } else {
+    messages = [
+      { id: 'm-c1', sender_id: 'mock-user-1', receiver_id: 'mock-admin-id', message: 'สวัสดีครับแอดมิน มีปัญหาเรื่องการลบคำอวยพรครับ', created_at: new Date(Date.now() - 3600000).toISOString(), is_read: false },
+      { id: 'm-c2', sender_id: 'mock-admin-id', receiver_id: 'mock-user-1', message: 'สวัสดีครับคุณสมชาย ปัญหาเกิดจากอะไรครับผม?', created_at: new Date(Date.now() - 3000000).toISOString(), is_read: true },
+      { id: 'm-c3', sender_id: 'mock-user-2', receiver_id: 'mock-admin-id', message: 'สวัสดีค่ะ ชอบธีมสมุดสเก็ตช์มากเลยค่ะ สวยมากๆ', created_at: new Date(Date.now() - 600000).toISOString(), is_read: false }
+    ];
+    localStorage.setItem('myfestival_mock_chat_messages', JSON.stringify(messages));
+  }
+  
+  renderChatUsers(mockUsers, messages);
+}
+
+function renderChatUsers(users, messages) {
+  const container = document.getElementById('chat-users-list');
+  if (!container) return;
+  
+  if (users.length === 0) {
+    container.innerHTML = `<p class="text-pencil-light font-bold italic text-center py-6 text-sm">ไม่มีรายชื่อผู้ติดต่อ...</p>`;
+    return;
+  }
+  
+  const userLatestMsgTime = {};
+  users.forEach(u => {
+    const userMsgs = messages.filter(m => m.sender_id === u.id || m.receiver_id === u.id);
+    if (userMsgs.length > 0) {
+      userLatestMsgTime[u.id] = new Date(userMsgs[0].created_at).getTime();
+    } else {
+      userLatestMsgTime[u.id] = 0;
+    }
+  });
+  users.sort((a, b) => (userLatestMsgTime[b.id] || 0) - (userLatestMsgTime[a.id] || 0));
+  
+  container.innerHTML = users.map(user => {
+    const userMsgs = messages.filter(m => m.sender_id === user.id || m.receiver_id === user.id);
+    const latestMsg = userMsgs.length > 0 ? userMsgs[0].message : 'เริ่มแชทใหม่...';
+    const unreadCount = userMsgs.filter(m => m.sender_id === user.id && !m.is_read).length;
+    
+    const isActive = activeChatUserId === user.id;
+    const activeClass = isActive ? 'bg-wood-yellow shadow-[2px_2px_0px_0px_#4a3c31] border-2 border-pencil' : 'hover:bg-pencil-soft/20 border-2 border-transparent';
+    const badgeHtml = unreadCount > 0 ? `<span class="bg-wood-red text-pencil text-[10px] font-black w-5 h-5 rounded-full flex items-center justify-center border-2 border-pencil shadow-[1px_1px_0px_0px_#4a3c31]">${unreadCount}</span>` : '';
+    
+    return `
+      <div data-user-id="${user.id}" class="chat-user-item p-2.5 rounded-xl flex items-center justify-between gap-2.5 cursor-pointer transition-all ${activeClass}">
+        <div class="flex items-center gap-2.5 overflow-hidden">
+          <img src="${user.avatar_url || 'https://api.dicebear.com/7.x/fun-emoji/svg?seed=' + user.email}" class="w-9 h-9 rounded-full border-2 border-pencil" alt="Avatar">
+          <div class="overflow-hidden">
+            <p class="font-extrabold text-sm text-pencil leading-tight truncate">${user.full_name || user.email}</p>
+            <p class="text-[10px] text-pencil-light truncate">${escapeHTML(latestMsg)}</p>
+          </div>
+        </div>
+        ${badgeHtml}
+      </div>
+    `;
+  }).join('');
+  
+  container.querySelectorAll('.chat-user-item').forEach(el => {
+    el.addEventListener('click', async (e) => {
+      const userId = e.currentTarget.getAttribute('data-user-id');
+      await openUserChat(userId, users, messages);
+    });
+  });
+}
+
+async function openUserChat(userId, users, messages) {
+  activeChatUserId = userId;
+  
+  renderChatUsers(users, messages);
+  
+  const chatMessagesEl = document.getElementById('admin-chat-messages');
+  const chatInputForm = document.getElementById('admin-chat-input-form');
+  
+  if (!chatMessagesEl || !chatInputForm) return;
+  
+  chatInputForm.classList.remove('hidden');
+  
+  const user = users.find(u => u.id === userId);
+  const userMsgs = messages.filter(m => m.sender_id === userId || m.receiver_id === userId).reverse();
+  
+  chatMessagesEl.innerHTML = `
+    <div class="text-center py-1 text-pencil-light text-xs font-bold italic border-b border-dashed border-pencil/20 pb-2 mb-2">
+      บทสนทนากับ: ${user?.full_name || user?.email}
+    </div>
+  `;
+  
+  userMsgs.forEach(msg => {
+    const isSentByAdmin = msg.sender_id === currentUserId || msg.sender_id === 'mock-admin-id';
+    const bubble = document.createElement('div');
+    bubble.className = isSentByAdmin ? 'chat-bubble-sent' : 'chat-bubble-received';
+    const time = new Date(msg.created_at).toLocaleTimeString('th-TH', { hour: '2-digit', minute: '2-digit' });
+    bubble.innerHTML = `
+      <p class="text-sm font-bold">${escapeHTML(msg.message)}</p>
+      <span class="block text-[8px] text-right mt-1 opacity-70 font-semibold">${time}</span>
+    `;
+    chatMessagesEl.appendChild(bubble);
+  });
+  
+  chatMessagesEl.scrollTop = chatMessagesEl.scrollHeight;
+  
+  if (useMockChat) {
+    let raw = localStorage.getItem('myfestival_mock_chat_messages');
+    if (raw) {
+      try {
+        let list = JSON.parse(raw);
+        list.forEach(m => {
+          if (m.sender_id === userId && m.receiver_id === 'mock-admin-id') {
+            m.is_read = true;
+          }
+        });
+        localStorage.setItem('myfestival_mock_chat_messages', JSON.stringify(list));
+        
+        const key = `myfestival_mock_chat_${userId}`;
+        const userRaw = localStorage.getItem(key);
+        if (userRaw) {
+          let userList = JSON.parse(userRaw);
+          userList.forEach(m => {
+            if (m.sender_id === userId) m.is_read = true;
+          });
+          localStorage.setItem(key, JSON.stringify(userList));
+        }
+      } catch (e) {}
+    }
+  } else {
+    const supabase = await getSupabase();
+    if (supabase) {
+      await supabase
+        .from('chat_messages')
+        .update({ is_read: true })
+        .eq('sender_id', userId)
+        .eq('receiver_id', currentUserId)
+        .eq('is_read', false);
+    }
+  }
+}
+
+function setupChatHubEvents() {
+  const form = document.getElementById('admin-chat-input-form');
+  const inputEl = document.getElementById('admin-chat-input');
+  
+  if (!form || form.dataset.listenerBound) return;
+  form.dataset.listenerBound = 'true';
+  
+  form.addEventListener('submit', async (e) => {
+    e.preventDefault();
+    if (!activeChatUserId) return;
+    
+    const messageText = inputEl.value.trim();
+    if (!messageText) return;
+    
+    inputEl.value = '';
+    
+    if (useMockChat) {
+      const mockMsg = {
+        id: `m-admin-${Date.now()}`,
+        sender_id: 'mock-admin-id',
+        receiver_id: activeChatUserId,
+        message: messageText,
+        is_read: true,
+        created_at: new Date().toISOString()
+      };
+      
+      let raw = localStorage.getItem('myfestival_mock_chat_messages');
+      let list = [];
+      if (raw) {
+        try { list = JSON.parse(raw); } catch (e) {}
+      }
+      list.push(mockMsg);
+      localStorage.setItem('myfestival_mock_chat_messages', JSON.stringify(list));
+      
+      const key = `myfestival_mock_chat_${activeChatUserId}`;
+      const userRaw = localStorage.getItem(key);
+      let userList = [];
+      if (userRaw) {
+        try { userList = JSON.parse(userRaw); } catch(e) {}
+      }
+      userList.push(mockMsg);
+      localStorage.setItem(key, JSON.stringify(userList));
+      
+      await loadMockChats();
+      
+      const activeItem = document.querySelector(`.chat-user-item[data-user-id="${activeChatUserId}"]`);
+      if (activeItem) activeItem.click();
+    } else {
+      const supabase = await getSupabase();
+      if (supabase) {
+        try {
+          const { error } = await supabase
+            .from('chat_messages')
+            .insert({
+              sender_id: currentUserId,
+              receiver_id: activeChatUserId,
+              message: messageText
+            });
+          if (error) throw error;
+        } catch (err) {
+          console.error('Failed to send admin chat message:', err);
+          showToast('ไม่สามารถส่งข้อความได้', 'error');
+        }
+      }
+    }
+  });
+}
+
+function setupChatRealtime(supabase) {
+  if (chatSubscription) {
+    chatSubscription.unsubscribe();
+  }
+  
+  if (!supabase) return;
+  
+  chatSubscription = supabase
+    .channel('admin-chat-messages-realtime')
+    .on(
+      'postgres_changes',
+      { event: '*', schema: 'public', table: 'chat_messages' },
+      async () => {
+        const tab = document.getElementById('tab-chats');
+        if (tab && tab.classList.contains('btn-yellow')) {
+          const savedActiveUserId = activeChatUserId;
+          
+          const { data: messages, error } = await supabase
+            .from('chat_messages')
+            .select('*')
+            .or(`sender_id.eq.${currentUserId},receiver_id.eq.${currentUserId}`)
+            .order('created_at', { ascending: false });
+            
+          if (!error && messages) {
+            const userIds = [...new Set(messages.map(m => m.sender_id === currentUserId ? m.receiver_id : m.sender_id))];
+            let chatUsers = [];
+            if (userIds.length > 0) {
+              const { data: profiles } = await supabase.from('profiles').select('*').in('id', userIds);
+              if (profiles) chatUsers = profiles;
+            }
+            
+            renderChatUsers(chatUsers, messages);
+            
+            if (savedActiveUserId) {
+              const activeItem = document.querySelector(`.chat-user-item[data-user-id="${savedActiveUserId}"]`);
+              if (activeItem) {
+                await openUserChat(savedActiveUserId, chatUsers, messages);
+              }
+            }
+          }
+        }
+      }
+    )
+    .subscribe();
+}
+
+function escapeHTML(str) {
+  return str.replace(/[&<>'"]/g, 
+    tag => ({
+      '&': '&amp;',
+      '<': '&lt;',
+      '>': '&gt;',
+      "'": '&#39;',
+      '"': '&quot;'
+    }[tag] || tag)
+  );
+}
+
 export const cleanup = () => {
   console.log('Cleaning up admin realtime subscriptions...');
   if (profilesSubscription) {
@@ -2984,5 +3328,9 @@ export const cleanup = () => {
   if (aboutSubscription) {
     aboutSubscription.unsubscribe();
     aboutSubscription = null;
+  }
+  if (chatSubscription) {
+    chatSubscription.unsubscribe();
+    chatSubscription = null;
   }
 };
