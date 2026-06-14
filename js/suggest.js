@@ -79,6 +79,8 @@ function setupDatePickers() {
     window.flatpickr('#suggest-start-date', {
       enableTime: false,
       dateFormat: 'Y-m-d',
+      altInput: true,
+      altFormat: 'd/m/Y',
       locale: 'th',
       defaultDate: new Date()
     });
@@ -86,6 +88,8 @@ function setupDatePickers() {
     window.flatpickr('#suggest-end-date', {
       enableTime: false,
       dateFormat: 'Y-m-d',
+      altInput: true,
+      altFormat: 'd/m/Y',
       locale: 'th',
       defaultDate: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000)
     });
