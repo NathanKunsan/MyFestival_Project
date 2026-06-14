@@ -21,7 +21,7 @@
     <div class="space-y-8">
       <!-- Header -->
       <div class="text-center max-w-xl mx-auto space-y-2">
-        <h1 class="text-2xl sm:text-3xl md:text-4xl font-extrabold hover-wiggle">
+        <h1 class="text-2xl sm:text-3xl md:text-4xl font-extrabold">
           🎨 <span class="scribble-highlight">ตกแต่งและดาวน์โหลดการ์ด</span>
         </h1>
         <p class="text-pencil-light text-xs sm:text-sm font-bold">
@@ -44,21 +44,6 @@
               <!-- Paper Pattern Overlay (Injected via JS classes) -->
               <div id="paper-pattern-overlay" class="absolute inset-0 pointer-events-none opacity-20 rounded-[inherit]">
               </div>
-              <!-- Spiral Rings Element (Shown only when spiral pattern is active) -->
-              <div id="paper-spiral-rings"
-                class="hidden absolute left-[6px] top-[10px] bottom-[10px] w-[20px] text-[#7c6858] font-normal text-[16px] leading-[1.55] z-20 opacity-80 whitespace-pre pointer-events-none">
-                ➰
-                ➰
-                ➰
-                ➰
-                ➰
-                ➰
-                ➰
-                ➰
-                ➰
-                ➰
-                ➰
-                ➰</div>
 
               <!-- Card Content -->
               <div class="relative z-10 flex-grow flex flex-col justify-center">
@@ -82,65 +67,10 @@
         <div class="lg:col-span-1 space-y-6">
           <div class="sketch-card p-6 bg-white shadow-[4px_4px_0px_0px_#4a3c31]">
             <h2 class="text-xl font-extrabold mb-4 pb-2 border-b-2 border-pencil">⚙️ ปรับแต่งกระดาษ</h2>
-
-            <!-- 1. Color Picker -->
             <div class="space-y-2.5 mb-6">
-              <label class="font-bold text-sm block">1. เลือกสีกระดาษ (Paper Color):</label>
-              <div id="paper-colors-wrapper" class="relative w-full max-w-[320px] aspect-[320/260] mx-auto">
-                <!-- SVG Palette and Brush Background -->
-                <svg viewBox="0 0 320 260" class="absolute inset-0 w-full h-full drop-shadow-md select-none pointer-events-none" xmlns="http://www.w3.org/2000/svg">
-                  <!-- Wooden Palette base -->
-                  <path d="M 270,90 
-                           C 310,130 310,190 260,220 
-                           C 210,250 140,240 100,220 
-                           C 70,205 70,180 80,160 
-                           C 90,140 60,110 50,90 
-                           C 35,60 70,25 120,20 
-                           C 180,15 230,50 270,90 Z" 
-                        fill="#e8cb9f" stroke="#4a3c31" stroke-width="4" stroke-linejoin="round" />
-                  
-                  <!-- Wood grain details -->
-                  <path d="M 100,45 C 130,40 180,55 210,95" fill="none" stroke="#d5b382" stroke-width="3" stroke-linecap="round" />
-                  <path d="M 130,210 C 170,215 210,205 235,180" fill="none" stroke="#d5b382" stroke-width="3" stroke-linecap="round" />
-
-                  <!-- Thumb hole -->
-                  <ellipse cx="105" cy="180" rx="15" ry="22" transform="rotate(-20 105 180)" fill="#faf6ee" stroke="#4a3c31" stroke-width="4" />
-
-                  <!-- Painter's Brush -->
-                  <g transform="translate(18, 15) rotate(-15)">
-                    <!-- Brush Handle -->
-                    <path d="M 25,240 C 23,240 20,230 18,120 C 18,80 22,60 25,50 C 28,60 32,80 32,120 C 30,230 27,240 25,240 Z" fill="#b17a50" stroke="#4a3c31" stroke-width="3" />
-                    <!-- Ferrule -->
-                    <path d="M 22,60 L 28,60 L 29,40 L 21,40 Z" fill="#d1d5db" stroke="#4a3c31" stroke-width="3" />
-                    <!-- Bristles -->
-                    <path d="M 21,40 C 21,25 25,10 25,10 C 25,10 29,25 29,40 Z" fill="#583f2e" stroke="#4a3c31" stroke-width="3" />
-                    <!-- Brush Tip Paint -->
-                    <path id="brush-tip-paint" d="M 23,25 C 25,10 25,10 27,25 C 26,30 24,30 23,25 Z" fill="#fffefb" />
-                  </g>
-                </svg>
-
-                <!-- Active Color Preview in the Center of the Palette -->
-                <div id="palette-center-preview" class="absolute w-12 h-12 rounded-full border-4 border-dashed border-pencil/30 flex items-center justify-center pointer-events-none shadow-[inset_1px_1px_4px_rgba(74,60,49,0.2)] bg-white transition-all duration-300" style="left: 45%; top: 44%; transform: translate(-50%, -50%);">
-                  <div id="palette-center-preview-inner" class="w-8 h-8 rounded-full border-2 border-pencil shadow-inner bg-[#fffefb] transition-colors duration-300"></div>
-                </div>
-                
-                <!-- Preset Colors (upper curve) -->
-                <button type="button" class="color-swatch absolute w-8 h-8 rounded-full border-2 border-pencil focus:scale-110 shadow-[1.5px_1.5px_0px_var(--color-pencil)] active:translate-x-[0.5px] active:translate-y-[0.5px] active:shadow-none transition-all" 
-                        style="background-color: #fffefb; left: 42%; top: 16%;" data-color="#fffefb" title="สีขาวครีม"></button>
-                <button type="button" class="color-swatch absolute w-8 h-8 rounded-full border-2 border-pencil focus:scale-110 shadow-[1.5px_1.5px_0px_var(--color-pencil)] active:translate-x-[0.5px] active:translate-y-[0.5px] active:shadow-none transition-all" 
-                        style="background-color: #fde2e4; left: 56%; top: 16%;" data-color="#fde2e4" title="สีชมพูพาสเทล"></button>
-                <button type="button" class="color-swatch absolute w-8 h-8 rounded-full border-2 border-pencil focus:scale-110 shadow-[1.5px_1.5px_0px_var(--color-pencil)] active:translate-x-[0.5px] active:translate-y-[0.5px] active:shadow-none transition-all" 
-                        style="background-color: #cce3f5; left: 70%; top: 22%;" data-color="#cce3f5" title="สีฟ้าพาสเทล"></button>
-                <button type="button" class="color-swatch absolute w-8 h-8 rounded-full border-2 border-pencil focus:scale-110 shadow-[1.5px_1.5px_0px_var(--color-pencil)] active:translate-x-[0.5px] active:translate-y-[0.5px] active:shadow-none transition-all" 
-                        style="background-color: #e2ece9; left: 80%; top: 33%;" data-color="#e2ece9" title="สีเขียวพาสเทล"></button>
-                <button type="button" class="color-swatch absolute w-8 h-8 rounded-full border-2 border-pencil focus:scale-110 shadow-[1.5px_1.5px_0px_var(--color-pencil)] active:translate-x-[0.5px] active:translate-y-[0.5px] active:shadow-none transition-all" 
-                        style="background-color: #f0e6ef; left: 84%; top: 48%;" data-color="#f0e6ef" title="สีม่วงพาสเทล"></button>
-                
-                <!-- Dynamic custom colors list -->
-                <div id="user-colors-list"></div>
-
-                <!-- Add color (+) button -->
-                <button type="button" id="btn-open-color-picker" class="hidden absolute w-8 h-8 rounded-full border-2 border-dashed border-pencil/60 hover:border-pencil hover:bg-pencil-soft/30 flex items-center justify-center text-md font-black focus:scale-110 shadow-[1px_1px_0px_var(--color-pencil)] active:translate-x-[0.5px] active:translate-y-[0.5px] active:shadow-none transition-all" title="เพิ่มสีกำหนดเอง">+</button>
+              <label class="font-bold text-sm block">1. เลือกสีกระดาษ :</label>
+              <div id="pencil-holder-case">
+                <!-- Preset Colored Pencils and Custom Colored Pencils will be rendered here dynamically -->
               </div>
             </div>
 
@@ -161,8 +91,24 @@
                   กระดาษตาราง
                 </button>
                 <button type="button" class="pattern-btn sketch-btn btn-cream text-xs py-1.5 font-bold"
-                  data-pattern="spiral">
-                  สมุดห่วงเหล็ก
+                  data-pattern="wood-frame">
+                  กรอบไม้ระบายสี
+                </button>
+                <button type="button" class="pattern-btn sketch-btn btn-cream text-xs py-1.5 font-bold"
+                  data-pattern="washi-tape">
+                  เทปตกแต่งมุม
+                </button>
+                <button type="button" class="pattern-btn sketch-btn btn-cream text-xs py-1.5 font-bold"
+                  data-pattern="botanical">
+                  ใบไม้ธรรมชาติ
+                </button>
+                <button type="button" class="pattern-btn sketch-btn btn-cream text-xs py-1.5 font-bold"
+                  data-pattern="ticket">
+                  ขอบตั๋วโบราณ
+                </button>
+                <button type="button" class="pattern-btn sketch-btn btn-cream text-xs py-1.5 font-bold"
+                  data-pattern="sparkles">
+                  ประกายดาววิบวับ
                 </button>
               </div>
             </div>
@@ -187,74 +133,74 @@
 
     <!-- Add Custom Color Modal -->
     <div id="add-color-modal" class="hidden fixed inset-0 z-50 flex items-center justify-center bg-black/60 px-4">
-      <div class="sketch-card p-6 max-w-sm w-full bg-white relative max-h-[90vh] overflow-y-auto shadow-[6px_6px_0px_0px_#4a3c31]">
+      <div
+        class="sketch-card p-6 max-w-sm w-full bg-white relative max-h-[90vh] overflow-y-auto shadow-[6px_6px_0px_0px_#4a3c31]">
         <button id="btn-close-color-modal-x"
           class="absolute top-4 right-4 text-pencil hover:text-wood-red font-bold text-2xl"
           aria-label="Close modal">×</button>
 
-        <h3 id="color-modal-title" class="text-xl font-extrabold mb-4 pb-2 border-b-2 border-pencil text-center">🎨 ผสมสีกระดาษใหม่</h3>
+        <h3 id="color-modal-title" class="text-xl font-extrabold mb-4 pb-2 border-b-2 border-pencil text-center">🎨
+          ผสมสีกระดาษใหม่</h3>
 
         <form id="add-color-form" class="space-y-4">
-          
+
           <!-- Preset Palette for Fast Selection inside modal -->
           <div class="space-y-2">
             <label class="font-bold text-sm block text-pencil">จานสียอดนิยม (Pastel Presets):</label>
             <div class="grid grid-cols-5 gap-2">
-              <button type="button" class="modal-preset-color w-8 h-8 rounded-full border-2 border-pencil focus:scale-110 shadow-[1px_1px_0px_var(--color-pencil)] transition-all" style="background-color: #fffefb;" data-hex="#fffefb"></button>
-              <button type="button" class="modal-preset-color w-8 h-8 rounded-full border-2 border-pencil focus:scale-110 shadow-[1px_1px_0px_var(--color-pencil)] transition-all" style="background-color: #fde2e4;" data-hex="#fde2e4"></button>
-              <button type="button" class="modal-preset-color w-8 h-8 rounded-full border-2 border-pencil focus:scale-110 shadow-[1px_1px_0px_var(--color-pencil)] transition-all" style="background-color: #cce3f5;" data-hex="#cce3f5"></button>
-              <button type="button" class="modal-preset-color w-8 h-8 rounded-full border-2 border-pencil focus:scale-110 shadow-[1px_1px_0px_var(--color-pencil)] transition-all" style="background-color: #e2ece9;" data-hex="#e2ece9"></button>
-              <button type="button" class="modal-preset-color w-8 h-8 rounded-full border-2 border-pencil focus:scale-110 shadow-[1px_1px_0px_var(--color-pencil)] transition-all" style="background-color: #f0e6ef;" data-hex="#f0e6ef"></button>
-              
-              <button type="button" class="modal-preset-color w-8 h-8 rounded-full border-2 border-pencil focus:scale-110 shadow-[1px_1px_0px_var(--color-pencil)] transition-all" style="background-color: #fefae0;" data-hex="#fefae0"></button>
-              <button type="button" class="modal-preset-color w-8 h-8 rounded-full border-2 border-pencil focus:scale-110 shadow-[1px_1px_0px_var(--color-pencil)] transition-all" style="background-color: #faedcd;" data-hex="#faedcd"></button>
-              <button type="button" class="modal-preset-color w-8 h-8 rounded-full border-2 border-pencil focus:scale-110 shadow-[1px_1px_0px_var(--color-pencil)] transition-all" style="background-color: #d8f3dc;" data-hex="#d8f3dc"></button>
-              <button type="button" class="modal-preset-color w-8 h-8 rounded-full border-2 border-pencil focus:scale-110 shadow-[1px_1px_0px_var(--color-pencil)] transition-all" style="background-color: #ffe5ec;" data-hex="#ffe5ec"></button>
-              <button type="button" class="modal-preset-color w-8 h-8 rounded-full border-2 border-pencil focus:scale-110 shadow-[1px_1px_0px_var(--color-pencil)] transition-all" style="background-color: #e8dbcd;" data-hex="#e8dbcd"></button>
+              <button type="button"
+                class="modal-preset-color w-8 h-8 rounded-full border-2 border-pencil focus:scale-110 shadow-[1px_1px_0px_var(--color-pencil)] transition-all"
+                style="background-color: #fffefb;" data-hex="#fffefb"></button>
+              <button type="button"
+                class="modal-preset-color w-8 h-8 rounded-full border-2 border-pencil focus:scale-110 shadow-[1px_1px_0px_var(--color-pencil)] transition-all"
+                style="background-color: #fde2e4;" data-hex="#fde2e4"></button>
+              <button type="button"
+                class="modal-preset-color w-8 h-8 rounded-full border-2 border-pencil focus:scale-110 shadow-[1px_1px_0px_var(--color-pencil)] transition-all"
+                style="background-color: #cce3f5;" data-hex="#cce3f5"></button>
+              <button type="button"
+                class="modal-preset-color w-8 h-8 rounded-full border-2 border-pencil focus:scale-110 shadow-[1px_1px_0px_var(--color-pencil)] transition-all"
+                style="background-color: #e2ece9;" data-hex="#e2ece9"></button>
+              <button type="button"
+                class="modal-preset-color w-8 h-8 rounded-full border-2 border-pencil focus:scale-110 shadow-[1px_1px_0px_var(--color-pencil)] transition-all"
+                style="background-color: #f0e6ef;" data-hex="#f0e6ef"></button>
+
+              <button type="button"
+                class="modal-preset-color w-8 h-8 rounded-full border-2 border-pencil focus:scale-110 shadow-[1px_1px_0px_var(--color-pencil)] transition-all"
+                style="background-color: #fefae0;" data-hex="#fefae0"></button>
+              <button type="button"
+                class="modal-preset-color w-8 h-8 rounded-full border-2 border-pencil focus:scale-110 shadow-[1px_1px_0px_var(--color-pencil)] transition-all"
+                style="background-color: #faedcd;" data-hex="#faedcd"></button>
+              <button type="button"
+                class="modal-preset-color w-8 h-8 rounded-full border-2 border-pencil focus:scale-110 shadow-[1px_1px_0px_var(--color-pencil)] transition-all"
+                style="background-color: #d8f3dc;" data-hex="#d8f3dc"></button>
+              <button type="button"
+                class="modal-preset-color w-8 h-8 rounded-full border-2 border-pencil focus:scale-110 shadow-[1px_1px_0px_var(--color-pencil)] transition-all"
+                style="background-color: #ffe5ec;" data-hex="#ffe5ec"></button>
+              <button type="button"
+                class="modal-preset-color w-8 h-8 rounded-full border-2 border-pencil focus:scale-110 shadow-[1px_1px_0px_var(--color-pencil)] transition-all"
+                style="background-color: #e8dbcd;" data-hex="#e8dbcd"></button>
             </div>
           </div>
 
-          <!-- Custom HSL Sliders -->
-          <div class="space-y-3 pt-2">
-            <label class="font-bold text-sm block text-pencil">ผสมสีสไตล์สีไม้ (HSL Sliders):</label>
-            
-            <!-- Color Preview Block -->
-            <div class="flex items-center gap-4 py-2">
-              <div id="hsl-color-preview" class="w-16 h-16 rounded-full border-4 border-pencil shadow-[2px_2px_0px_0px_#4a3c31] bg-white transition-colors duration-100"></div>
-              <div class="flex flex-col gap-1">
-                <label for="user-color-hex" class="font-bold text-xs text-pencil-light">รหัสสี HEX:</label>
-                <input type="text" id="user-color-hex" placeholder="#FFFFFF" readonly
-                  class="sketch-input text-sm py-1 px-3 w-32 uppercase font-bold text-center bg-pencil-soft/10 cursor-not-allowed">
-              </div>
-            </div>
+          <!-- Color Wheel & Preview -->
+          <div class="space-y-4 pt-2">
+            <label class="font-bold text-sm block text-pencil text-center">เลือกสีจากวงล้อสี:</label>
 
-            <!-- HSL Controls -->
-            <div class="space-y-2.5">
-              <!-- Hue Slider -->
-              <div class="flex flex-col gap-1">
-                <div class="flex justify-between text-xs font-bold text-pencil">
-                  <span>โทนสี (Hue):</span>
-                  <span id="val-hue">0°</span>
-                </div>
-                <input type="range" id="hsl-hue" min="0" max="360" value="0" class="w-full accent-pencil h-2 rounded-lg cursor-pointer bg-gradient-to-r from-red-500 via-yellow-500 via-green-500 via-blue-500 via-purple-500 to-red-500">
-              </div>
+            <div class="flex flex-col items-center justify-center gap-4">
+              <!-- Canvas Color Wheel -->
+              <canvas id="color-wheel-canvas" width="160" height="160"
+                class="cursor-pointer rounded-full border-3 border-pencil shadow-md"></canvas>
 
-              <!-- Saturation Slider -->
-              <div class="flex flex-col gap-1">
-                <div class="flex justify-between text-xs font-bold text-pencil">
-                  <span>ความอิ่มสี (Saturation):</span>
-                  <span id="val-saturation">100%</span>
+              <!-- Color Preview Block -->
+              <div class="flex items-center gap-4 py-1.5 w-full justify-center">
+                <div id="hsl-color-preview"
+                  class="w-12 h-12 rounded-full border-3 border-pencil shadow-[2px_2px_0px_0px_#4a3c31] bg-white transition-colors duration-100">
                 </div>
-                <input type="range" id="hsl-saturation" min="0" max="100" value="100" class="w-full accent-pencil h-2 rounded-lg cursor-pointer bg-pencil-soft/30">
-              </div>
-
-              <!-- Lightness Slider -->
-              <div class="flex flex-col gap-1">
-                <div class="flex justify-between text-xs font-bold text-pencil">
-                  <span>ความสว่าง (Lightness - *แนะนำสีอ่อน):</span>
-                  <span id="val-lightness">90%</span>
+                <div class="flex flex-col gap-0.5">
+                  <label for="user-color-hex" class="font-bold text-xs text-pencil-light">รหัสสี HEX:</label>
+                  <input type="text" id="user-color-hex" placeholder="#FFFFFF" maxlength="7"
+                    class="sketch-input text-sm py-1 px-3 w-32 uppercase font-bold text-center border-2 border-pencil bg-white">
                 </div>
-                <input type="range" id="hsl-lightness" min="65" max="100" value="90" class="w-full accent-pencil h-2 rounded-lg cursor-pointer bg-pencil-soft/30">
               </div>
             </div>
           </div>
@@ -262,29 +208,35 @@
           <div class="sketch-divider"></div>
 
           <div class="flex justify-end gap-3">
-            <button type="button" id="btn-close-color-modal"
-              class="sketch-btn btn-cream px-4 py-1.5 text-sm">ยกเลิก</button>
-            <button type="submit" id="btn-submit-color" class="sketch-btn btn-yellow px-5 py-1.5 text-sm font-bold">บันทึกสีนี้ 💾</button>
+            <button type="submit" id="btn-submit-color"
+              class="sketch-btn btn-yellow px-5 py-1.5 text-sm font-bold">บันทึกสีนี้ 💾</button>
           </div>
         </form>
       </div>
     </div>
 
     <!-- Mobile Download/Save Image Preview Modal -->
-    <div id="mobile-download-modal" class="hidden fixed inset-0 z-50 flex items-center justify-center bg-black/80 px-4 py-6">
-      <div class="sketch-card p-6 max-w-sm w-full bg-white relative max-h-[95vh] flex flex-col justify-between overflow-y-auto">
-        <button id="btn-close-mobile-download-x" class="absolute top-4 right-4 text-pencil hover:text-wood-red font-bold text-2xl" aria-label="Close modal">×</button>
-        
+    <div id="mobile-download-modal"
+      class="hidden fixed inset-0 z-50 flex items-center justify-center bg-black/80 px-4 py-6">
+      <div
+        class="sketch-card p-6 max-w-sm w-full bg-white relative max-h-[95vh] flex flex-col justify-between overflow-y-auto">
+        <button id="btn-close-mobile-download-x"
+          class="absolute top-4 right-4 text-pencil hover:text-wood-red font-bold text-2xl"
+          aria-label="Close modal">×</button>
+
         <div class="text-center mb-2">
           <h3 class="text-xl font-extrabold text-pencil">📱 บันทึกรูปภาพ</h3>
           <p class="text-xs font-bold text-pencil-light">แตะค้างที่รูปภาพด้านล่างเพื่อบันทึกการ์ดคำอวยพรลงเครื่อง</p>
         </div>
 
-        <div class="flex-grow flex items-center justify-center my-4 overflow-hidden border-2 border-pencil rounded-lg bg-pencil-soft/10">
-          <img id="mobile-download-img" class="max-h-[50vh] max-w-full object-contain pointer-events-auto" alt="การ์ดอวยพรของคุณ">
+        <div
+          class="flex-grow flex items-center justify-center my-4 overflow-hidden border-2 border-pencil rounded-lg bg-pencil-soft/10">
+          <img id="mobile-download-img" class="max-h-[50vh] max-w-full object-contain pointer-events-auto"
+            alt="การ์ดอวยพรของคุณ">
         </div>
 
-        <button type="button" id="btn-close-mobile-download" class="sketch-btn btn-cream w-full py-2 text-sm font-bold mt-2">
+        <button type="button" id="btn-close-mobile-download"
+          class="sketch-btn btn-cream w-full py-2 text-sm font-bold mt-2">
           ปิดหน้าต่าง
         </button>
       </div>
