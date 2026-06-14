@@ -1,1082 +1,284 @@
-/* MyFestival Sketchbook Style System */
-@import url('https://fonts.googleapis.com/css2?family=Itim&family=Mali:ital,wght@0,300;0,400;0,500;0,600;0,700;1,300;1,400;1,500;1,600;1,700&display=swap');
+// MyFestival - Archive Controller
+import { getSupabase } from './supabase.js';
+import { showToast } from './router.js';
 
-:root {
-  --color-paper: #faf6ee;
-  --color-card-bg: #fffefb;
-  --color-pencil: #4a3c31;
-  --color-pencil-light: #7c6858;
-  --color-pencil-soft: #ebdcb9;
+let archivedFestivals = [];
+
+// Initialize Page
+export const init = async () => {
+  const supabase = await getSupabase();
+  if (!supabase) return;
   
-  /* Colored wood-pencils */
-  --color-wood-red: #e88b74;
-  --color-wood-yellow: #f0c365;
-  --color-wood-green: #8ab580;
-  --color-wood-blue: #7aa8c4;
-  --color-wood-pink: #e4a1b9;
-  --color-wood-purple: #bca0d3;
-  --color-wood-orange: #f5a863;
+  await fetchArchivedFestivals(supabase);
+  setupSearchFilter();
+  setupLockEvents();
+};
+
+function setupLockEvents() {
+  const grid = document.getElementById('archive-grid');
+  if (grid && !grid.dataset.listenerAttached) {
+    grid.dataset.listenerAttached = 'true';
+    grid.addEventListener('click', (e) => {
+      const upcomingBtn = e.target.closest('.btn-upcoming-lock');
+      const endedBtn = e.target.closest('.btn-ended-lock');
+      
+      if (upcomingBtn) {
+        e.preventDefault();
+        showToast('เทศกาลนี้ยังไม่เริ่มจัดงาน ไม่สามารถสุ่มคำอวยพรได้ครับ ⏳', 'warning');
+      } else if (endedBtn) {
+        e.preventDefault();
+        showToast('เทศกาลนี้ได้สิ้นสุดลงแล้ว ไม่สามารถสุ่มคำอวยพรได้ครับ 💾', 'warning');
+      }
+    });
+  }
+}
+
+// Helper for mock festivals data fallback
+const getMockFestivals = () => {
+  const now = new Date();
   
-  /* Font Family */
-  --font-handwriting: 'Itim', 'Mali', sans-serif;
-}
-
-/* Base Settings */
-body {
-  font-family: var(--font-handwriting);
-  color: var(--color-pencil);
-  background-color: #d7b899; /* Warm pinewood desk tone */
-  background-image: 
-    linear-gradient(90deg, rgba(74, 60, 49, 0.12) 2px, transparent 2px), /* Plank joints */
-    repeating-linear-gradient(0deg, rgba(255, 255, 255, 0.03) 0px, rgba(255, 255, 255, 0.03) 30px, rgba(0, 0, 0, 0.03) 30px, rgba(0, 0, 0, 0.03) 60px); /* Wood grain shading */
-  background-size: 160px 100%, 100% 60px;
-  line-height: 1.6;
-  min-height: 100vh;
-}
-
-/* Paper Grain Texture Overlay */
-.paper-grain {
-  position: relative;
-}
-
-/* Notebook Grid Lines (for Hero background or special views) */
-.notebook-lines {
-  background-color: var(--color-card-bg);
-  background-image: linear-gradient(var(--color-pencil-soft) 1px, transparent 1px);
-  background-size: 100% 28px;
-  line-height: 28px;
-}
-
-/* Sketch Card Component */
-.sketch-card {
-  background-color: var(--color-card-bg);
-  border: 3px solid var(--color-pencil);
-  /* Irregular hand-drawn border curve */
-  border-radius: 255px 15px 225px 15px/15px 225px 15px 255px;
-  box-shadow: 4px 4px 0px 0px var(--color-pencil);
-  transition: transform 0.2s ease, box-shadow 0.2s ease;
-  position: relative;
-  overflow: hidden;
-}
-.sketch-card:hover {
-  transform: translate(-2px, -2px);
-  box-shadow: 6px 6px 0px 0px var(--color-pencil);
-}
-
-/* Card Alt curves to look organic and varied */
-.sketch-card-alt {
-  border-radius: 20px 220px 15px 200px/210px 15px 220px 20px;
-}
-
-/* Sketch Border Only (without background) */
-.sketch-border {
-  border: 3px solid var(--color-pencil);
-  border-radius: 255px 15px 225px 15px/15px 225px 15px 255px;
-}
-
-/* Sketch Input Styles */
-.sketch-input {
-  background-color: var(--color-card-bg);
-  border: 2px solid var(--color-pencil);
-  border-radius: 95px 15px 105px 12px/15px 105px 12px 95px;
-  padding: 0.75rem 1rem;
-  color: var(--color-pencil);
-  font-family: var(--font-handwriting);
-  outline: none;
-  box-shadow: 2px 2px 0px 0px var(--color-pencil);
-  transition: all 0.15s ease;
-}
-.sketch-input:focus {
-  transform: translate(-1px, -1px);
-  box-shadow: 4px 4px 0px 0px var(--color-pencil);
-  border-color: var(--color-pencil-light);
-}
-select.sketch-input {
-  appearance: none;
-  -webkit-appearance: none;
-  -moz-appearance: none;
-  background-image: url("data:image/svg+xml;charset=UTF-8,%3csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%234a3c31' stroke-width='3' stroke-linecap='round' stroke-linejoin='round'%3e%3cpolyline points='6 9 12 15 18 9'%3e%3c/polyline%3e%3c/svg%3e");
-  background-repeat: no-repeat;
-  background-position: right 1rem center;
-  background-size: 1.1em;
-  padding-right: 2.5rem;
-  cursor: pointer;
-}
-
-/* Sketch Button Styles */
-.sketch-btn {
-  font-family: var(--font-handwriting);
-  color: var(--color-pencil);
-  font-weight: 700;
-  border: 2px solid var(--color-pencil);
-  border-radius: 120px 15px 100px 15px/15px 100px 15px 120px;
-  box-shadow: 3px 3px 0px 0px var(--color-pencil);
-  transition: all 0.15s cubic-bezier(0.175, 0.885, 0.32, 1.275);
-  cursor: pointer;
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  gap: 0.5rem;
-  padding: 0.5rem 1.25rem;
-}
-.sketch-btn:hover {
-  transform: translate(-1px, -1px);
-  box-shadow: 4px 4px 0px 0px var(--color-pencil);
-}
-.sketch-btn:active {
-  transform: translate(2px, 2px);
-  box-shadow: 1px 1px 0px 0px var(--color-pencil);
-}
-
-/* Colored button themes (wood colors) */
-.btn-red { background-color: var(--color-wood-red); }
-.btn-yellow { background-color: var(--color-wood-yellow); }
-.btn-green { background-color: var(--color-wood-green); }
-.btn-blue { background-color: var(--color-wood-blue); }
-.btn-pink { background-color: var(--color-wood-pink); }
-.btn-purple { background-color: var(--color-wood-purple); }
-.btn-orange { background-color: var(--color-wood-orange); }
-.btn-cream { background-color: var(--color-pencil-soft); }
-
-/* Badges */
-.sketch-badge {
-  font-size: 0.875rem;
-  padding: 0.25rem 0.75rem;
-  border: 1.5px solid var(--color-pencil);
-  border-radius: 50px 10px 50px 10px/10px 50px 10px 50px;
-  display: inline-block;
-  font-weight: bold;
-}
-
-/* Hand Drawn Divider (looks like a pencil line) */
-.sketch-divider {
-  height: 4px;
-  background-color: var(--color-pencil);
-  border-radius: 50% / 10%;
-  margin: 1.5rem 0;
-  position: relative;
-  opacity: 0.8;
-}
-
-
-
-/* Wiggle animation specifically for notification bell */
-@keyframes bell-wiggle {
-  0% { transform: rotate(0deg); }
-  10% { transform: rotate(-15deg); }
-  20% { transform: rotate(12deg); }
-  30% { transform: rotate(-10deg); }
-  40% { transform: rotate(8deg); }
-  50% { transform: rotate(-6deg); }
-  60% { transform: rotate(4deg); }
-  70% { transform: rotate(-2deg); }
-  80% { transform: rotate(1deg); }
-  90% { transform: rotate(-0.5deg); }
-  100% { transform: rotate(0deg); }
-}
-.bell-shake {
-  animation: bell-wiggle 1s ease-in-out;
-  transform-origin: top center;
-}
-
-/* Scribble text highlight effect */
-.scribble-highlight {
-  position: relative;
-  z-index: 1;
-}
-.scribble-highlight::after {
-  content: '';
-  position: absolute;
-  left: -2px;
-  right: -2px;
-  bottom: 2px;
-  height: 8px;
-  background-color: var(--color-wood-yellow);
-  z-index: -1;
-  opacity: 0.6;
-  border-radius: 4px 8px 3px 6px/5px 3px 6px 4px;
-  transform: rotate(-1deg);
-}
-
-/* Custom Scrollbar for Sketchbook feel */
-::-webkit-scrollbar {
-  width: 12px;
-  height: 12px;
-}
-::-webkit-scrollbar-track {
-  background: var(--color-paper);
-  border-left: 2px solid var(--color-pencil);
-}
-::-webkit-scrollbar-thumb {
-  background: var(--color-pencil-soft);
-  border: 2px solid var(--color-pencil);
-  border-radius: 8px;
-}
-::-webkit-scrollbar-thumb:hover {
-  background: var(--color-wood-yellow);
-}
-
-/* Toast Messages */
-.sketch-toast {
-  pointer-events: auto;
-  position: relative;
-  z-index: 999;
-  background-color: var(--color-card-bg);
-  border: 3px solid var(--color-pencil);
-  border-radius: 20px 15px 20px 15px/15px 20px 15px 20px;
-  padding: 1rem 1.5rem;
-  box-shadow: 4px 4px 0px 0px var(--color-pencil);
-  display: flex;
-  align-items: center;
-  gap: 0.75rem;
-  animation: slideUp 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275) forwards;
-}
-
-@keyframes slideUp {
-  from {
-    transform: translateY(20px) scale(0.95);
-    opacity: 0;
-  }
-  to {
-    transform: translateY(0) scale(1);
-    opacity: 1;
-  }
-}
-
-/* --- Flatpickr Sketchbook Theme Styles --- */
-.flatpickr-calendar {
-  background-color: var(--color-card-bg) !important;
-  border: 3px solid var(--color-pencil) !important;
-  border-radius: 16px !important;
-  box-shadow: 4px 4px 0px 0px var(--color-pencil) !important;
-  font-family: var(--font-handwriting) !important;
-  padding: 8px !important;
-  width: auto !important;
-}
-
-/* Arrow adjustment */
-.flatpickr-calendar.arrowTop:before, .flatpickr-calendar.arrowTop:after {
-  display: none !important;
-}
-
-/* Month and Year navigation headers */
-.flatpickr-months {
-  margin-bottom: 6px !important;
-}
-.flatpickr-months .flatpickr-prev-month, 
-.flatpickr-months .flatpickr-next-month {
-  color: var(--color-pencil) !important;
-  fill: var(--color-pencil) !important;
-  padding: 10px !important;
-}
-.flatpickr-current-month {
-  color: var(--color-pencil) !important;
-  font-size: 1.15rem !important;
-  font-weight: 800 !important;
-  display: flex !important;
-  align-items: center !important;
-  justify-content: center !important;
-  gap: 6px !important;
-  height: 38px !important;
-}
-.flatpickr-current-month .flatpickr-monthDropdown-months {
-  font-family: var(--font-handwriting) !important;
-  font-weight: 700 !important;
-  color: var(--color-pencil) !important;
-  background-color: var(--color-card-bg) !important;
-  border: 2px solid var(--color-pencil) !important;
-  border-radius: 8px 12px 6px 10px/10px 6px 12px 8px !important;
-  padding: 0 24px 0 8px !important;
-  outline: none !important;
-  box-shadow: 2px 2px 0px 0px var(--color-pencil) !important;
-  cursor: pointer !important;
-  height: 34px !important;
-  box-sizing: border-box !important;
-  display: inline-block !important;
-  vertical-align: middle !important;
+  // Make Songkran active right now for demonstration
+  const songkranStart = new Date(now);
+  songkranStart.setDate(now.getDate() - 3);
+  const songkranEnd = new Date(now);
+  songkranEnd.setDate(now.getDate() + 5);
   
-  /* Custom hand-drawn arrow style */
-  appearance: none !important;
-  -webkit-appearance: none !important;
-  -moz-appearance: none !important;
-  background-image: url("data:image/svg+xml;charset=UTF-8,%3csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%234a3c31' stroke-width='4' stroke-linecap='round' stroke-linejoin='round'%3e%3cpolyline points='6 9 12 15 18 9'%3e%3c/polyline%3e%3c/svg%3e") !important;
-  background-repeat: no-repeat !important;
-  background-position: right 8px center !important;
-  background-size: 0.85em !important;
-  transition: all 0.15s ease !important;
-}
-.flatpickr-current-month .flatpickr-monthDropdown-months:hover {
-  transform: translate(-1px, -1px) !important;
-  box-shadow: 3px 3px 0px 0px var(--color-pencil) !important;
-  background-color: rgba(240, 195, 101, 0.15) !important;
-}
-.flatpickr-current-month .flatpickr-monthDropdown-months option {
-  background-color: var(--color-card-bg) !important;
-  color: var(--color-pencil) !important;
-  font-family: var(--font-handwriting) !important;
-}
+  // Make Loy Krathong upcoming
+  const loyStart = new Date(now);
+  loyStart.setDate(now.getDate() + 15);
+  const loyEnd = new Date(now);
+  loyEnd.setDate(now.getDate() + 25);
+  
+  // Make New Year ended
+  const nyStart = new Date(now);
+  nyStart.setDate(now.getDate() - 25);
+  const nyEnd = new Date(now);
+  nyEnd.setDate(now.getDate() - 15);
 
-.flatpickr-current-month .numInputWrapper {
-  width: 72px !important;
-  display: none !important;
-  position: relative !important;
-  height: 34px !important;
-  box-sizing: border-box !important;
-  vertical-align: middle !important;
-}
-.flatpickr-current-month input.cur-year {
-  font-family: var(--font-handwriting) !important;
-  font-weight: 700 !important;
-  color: var(--color-pencil) !important;
-  background-color: var(--color-card-bg) !important;
-  border: 2px solid var(--color-pencil) !important;
-  border-radius: 10px 6px 12px 8px/6px 12px 8px 10px !important;
-  padding: 0 18px 0 6px !important;
-  outline: none !important;
-  box-shadow: 2px 2px 0px 0px var(--color-pencil) !important;
-  box-sizing: border-box !important;
-  transition: all 0.15s ease !important;
-  height: 34px !important;
-  width: 100% !important;
-  display: block !important;
-}
-.flatpickr-current-month input.cur-year:hover {
-  transform: translate(-1px, -1px) !important;
-  box-shadow: 3px 3px 0px 0px var(--color-pencil) !important;
-}
-.flatpickr-current-month input.cur-year:focus {
-  border-color: var(--color-pencil-light) !important;
-}
+  return [
+    {
+      id: "f1111111-1111-1111-1111-111111111111",
+      name: "เทศกาลสงกรานต์ (Songkran Festival)",
+      description: "เทศกาลขึ้นปีใหม่ไทยอันแสนอบอุ่น ร่วมสืบสานประเพณีรดน้ำดำหัวผู้ใหญ่ เล่นน้ำสงกรานต์กันอย่างสนุกสนาน และส่งต่อคำอวยพรดีๆ ให้กัน",
+      image_url: "https://images.unsplash.com/photo-1582880786584-c5a45b85a3c0?w=800",
+      start_date: songkranStart.toISOString(),
+      end_date: songkranEnd.toISOString(),
+      messages: [
+        { id: "m1", status: "approved" },
+        { id: "m2", status: "approved" },
+        { id: "m3", status: "approved" }
+      ]
+    },
+    {
+      id: "f2222222-2222-2222-2222-222222222222",
+      name: "เทศกาลลอยกระทง (Loy Krathong)",
+      description: "ประเพณีลอยกระทงเพื่อขอขมาพระแม่คงคาในคืนวันเพ็ญเดือนสิบสอง ร่วมลอยกระทงประทีปโคมไฟ และขอพรส่งต่อความรักสุขใจ",
+      image_url: "https://images.unsplash.com/photo-1544644181-1484b3fdfc62?w=800",
+      start_date: loyStart.toISOString(),
+      end_date: loyEnd.toISOString(),
+      messages: [
+        { id: "m4", status: "approved" },
+        { id: "m5", status: "approved" }
+      ]
+    },
+    {
+      id: "f3333333-3333-3333-3333-333333333333",
+      name: "เทศกาลปีใหม่ (New Year Celebration)",
+      description: "เฉลิมฉลองเทศกาลส่งท้ายปีเก่าต้อนรับปีใหม่ ร่วมเคาท์ดาวน์สวดมนต์ข้ามปี และตั้งปณิธานส่งมอบความหวังกำลังใจให้กันและกัน",
+      image_url: "https://images.unsplash.com/photo-1512909006721-3d6018887383?w=800",
+      start_date: nyStart.toISOString(),
+      end_date: nyEnd.toISOString(),
+      messages: [
+        { id: "m6", status: "approved" }
+      ]
+    }
+  ];
+};
 
-/* Hide default browser spinner arrows */
-.flatpickr-current-month input.cur-year::-webkit-outer-spin-button,
-.flatpickr-current-month input.cur-year::-webkit-inner-spin-button {
-  -webkit-appearance: none !important;
-  appearance: none !important;
-  margin: 0 !important;
-}
-.flatpickr-current-month input.cur-year {
-  -moz-appearance: textfield !important;
-  appearance: textfield !important;
-}
-
-/* Flatpickr Year Arrows Style */
-.flatpickr-current-month .numInputWrapper span {
-  border: none !important;
-  background: transparent !important;
-  width: 14px !important;
-  height: 50% !important;
-  display: flex !important;
-  align-items: center !important;
-  justify-content: center !important;
-  right: 2px !important;
-  opacity: 0.8 !important;
-  transition: opacity 0.15s ease !important;
-}
-.flatpickr-current-month .numInputWrapper span:hover {
-  opacity: 1 !important;
-  background: rgba(240, 195, 101, 0.2) !important;
-  border-radius: 3px !important;
-}
-.flatpickr-current-month .numInputWrapper span.arrowUp::after {
-  border-bottom-color: var(--color-pencil) !important;
-}
-.flatpickr-current-month .numInputWrapper span.arrowDown::after {
-  border-top-color: var(--color-pencil) !important;
-}
-
-/* Limit to 5 weeks (35 days) per month */
-.flatpickr-days .flatpickr-day:nth-child(n+36) {
-  display: none !important;
-}
-.flatpickr-days, .flatpickr-days .dayContainer {
-  height: 195px !important;
-  min-height: 195px !important;
-  max-height: 195px !important;
-}
-
-/* Adjacent month days style: light brown color */
-.flatpickr-day.prevMonthDay, 
-.flatpickr-day.nextMonthDay {
-  color: #bfaea2 !important; /* Soft light brown */
-  opacity: 0.65 !important;
-}
-.flatpickr-day.prevMonthDay:hover, 
-.flatpickr-day.nextMonthDay:hover {
-  background-color: rgba(240, 195, 101, 0.15) !important;
-  color: var(--color-pencil) !important;
-  opacity: 1 !important;
-}
-
-/* Weekdays */
-span.flatpickr-weekday {
-  color: var(--color-pencil-light) !important;
-  font-weight: 800 !important;
-}
-
-/* Days */
-.flatpickr-day {
-  color: var(--color-pencil) !important;
-  font-weight: 700 !important;
-  border-radius: 6px !important;
-  border: 1px solid transparent !important;
-  transition: all 0.15s ease !important;
-}
-.flatpickr-day:hover, .flatpickr-day:focus {
-  background-color: rgba(240, 195, 101, 0.25) !important;
-  border-color: var(--color-pencil) !important;
-}
-.flatpickr-day.today {
-  border-color: var(--color-pencil) !important;
-  background-color: rgba(74, 60, 49, 0.05) !important;
-}
-.flatpickr-day.selected, .flatpickr-day.selected:hover {
-  background-color: var(--color-wood-yellow) !important;
-  color: var(--color-pencil) !important;
-  border: 2px solid var(--color-pencil) !important;
-  box-shadow: 2px 2px 0px 0px var(--color-pencil) !important;
-  transform: translate(-1px, -1px) !important;
-}
-.flatpickr-day.flatpickr-disabled, .flatpickr-day.flatpickr-disabled:hover {
-  color: var(--color-pencil-soft) !important;
-}
-
-/* Time Picker Section */
-.flatpickr-time {
-  border-top: 2px solid var(--color-pencil) !important;
-  background-color: var(--color-card-bg) !important;
-  border-radius: 0 0 16px 16px !important;
-}
-.flatpickr-time input, .flatpickr-time .flatpickr-am-pm {
-  color: var(--color-pencil) !important;
-  font-weight: 800 !important;
-  font-family: var(--font-handwriting) !important;
-  font-size: 1.1rem !important;
-}
-.flatpickr-time input:hover, .flatpickr-time .flatpickr-am-pm:hover,
-.flatpickr-time input:focus, .flatpickr-time .flatpickr-am-pm:focus {
-  background-color: rgba(240, 195, 101, 0.25) !important;
-}
-.flatpickr-time .flatpickr-time-separator {
-  color: var(--color-pencil) !important;
-  font-weight: 800 !important;
-}
-
-
-/* Main Content Notebook Canvas */
-#main-content {
-  background-color: var(--color-paper);
-  border: 4px solid var(--color-pencil);
-  border-radius: 12px 18px 10px 15px/15px 10px 18px 12px;
-  box-shadow: 8px 8px 0px 0px var(--color-pencil), 0px 10px 30px rgba(74, 60, 49, 0.15);
-  padding: 2.5rem;
-  margin-top: 2rem;
-  margin-bottom: 3rem;
-  position: relative;
-  transition: all 0.2s ease;
-}
-
-/* Responsive Notebook Layout adjustments */
-@media (max-width: 1023px) {
-  #main-content {
-    border: none;
-    border-radius: 0;
-    box-shadow: none;
-    padding: 1.25rem 1rem;
-    margin-top: 0;
-    margin-bottom: 0;
+// Fetch and filter ended festivals from database
+async function fetchArchivedFestivals(supabase) {
+  try {
+    const { data, error } = await supabase
+      .from('festivals')
+      .select('*, messages(id, status)')
+      .order('end_date', { ascending: false });
+      
+    if (error) throw error;
+    
+    archivedFestivals = data || [];
+    renderArchiveList(archivedFestivals);
+  } catch (error) {
+    console.warn('Error fetching archives, using mock data:', error.message);
+    archivedFestivals = getMockFestivals();
+    renderArchiveList(archivedFestivals);
   }
 }
 
-/* Hero Slider Navigation Buttons Hover fixes */
-#slider-prev,
-#slider-next {
-  transition: background-color 0.2s ease, transform 0.15s ease, box-shadow 0.15s ease;
-}
-
-#slider-prev:hover,
-#slider-next:hover {
-  transform: translateY(-50%) !important;
-  box-shadow: 2px 2px 0px 0px var(--color-pencil) !important;
-  background-color: #d2bc92 !important; /* สีครีมเข้มขึ้นอมน้ำตาล สว่างกว่าลูกศร #4a3c31 */
-}
-
-#slider-prev:active,
-#slider-next:active {
-  transform: translateY(-50%) translate(1px, 1px) !important;
-  box-shadow: 1px 1px 0px 0px var(--color-pencil) !important;
-}
-
-/* Mobile Hero Slider Buttons positioning */
-@media (max-width: 767px) {
-  #hero-section {
-    padding-bottom: 70px !important;
+// Render the filtered festival list
+function renderArchiveList(list) {
+  const grid = document.getElementById('archive-grid');
+  if (!grid) return;
+  
+  if (list.length === 0) {
+    grid.innerHTML = `
+      <div class="col-span-full text-center py-12">
+        <p class="text-lg font-bold text-pencil-light italic">🍂 ไม่พบสารบัญเทศกาลตามคำค้นหา</p>
+      </div>
+    `;
+    return;
   }
-  #slider-prev,
-  #slider-next {
-    position: absolute !important;
-    top: auto !important;
-    bottom: -60px !important;
-    transform: none !important;
+  
+  const now = new Date();
+  
+  grid.innerHTML = list.map(festival => {
+    const approvedCount = festival.messages.filter(m => m.status === 'approved').length;
+    const { startDate, endDate, isAnnual } = getFestivalDates(festival);
+    const startStr = formatDate(startDate, isAnnual);
+    const endStr = formatDate(endDate, isAnnual);
+    const dateRangeStr = isAnnual ? `${startStr} - ${endStr} (ประจำปี)` : `${startStr} - ${endStr}`;
+    const cleanDesc = isAnnual ? festival.description.replace('[ประจำปี]', '').trim() : festival.description;
+    
+    let statusBadge = '';
+    if (startDate <= now && endDate >= now) {
+      statusBadge = '<span class="sketch-badge btn-green text-[10px] font-black">🔴 ACTIVE</span>';
+    } else if (startDate > now) {
+      statusBadge = '<span class="sketch-badge btn-orange text-[10px] font-black">📅 UPCOMING</span>';
+    } else {
+      statusBadge = '<span class="sketch-badge btn-cream text-[10px] font-black">💾 ARCHIVED</span>';
+    }
+    
+    return `
+      <div class="sketch-card sketch-card-alt p-4 bg-white flex flex-col md:flex-row gap-4 items-center">
+        <!-- Thumbnail -->
+        <div class="w-full md:w-1/3 aspect-[4/3] rounded border-2 border-pencil overflow-hidden bg-pencil-soft">
+          <img src="${festival.image_url || 'https://images.unsplash.com/photo-1513151233558-d860c5398176?w=400'}" 
+               alt="${festival.name}" 
+               class="w-full h-full object-cover">
+        </div>
+        
+        <!-- Details -->
+        <div class="w-full md:w-2/3 flex flex-col justify-between h-full space-y-2">
+          <div>
+            <div class="flex items-center gap-1.5 flex-wrap">
+              <h3 class="text-xl font-extrabold">${festival.name}</h3>
+              ${statusBadge}
+            </div>
+            <p class="text-xs text-pencil-light font-bold">🗓️ ${dateRangeStr}</p>
+            <p class="festival-desc text-sm line-clamp-5 text-pencil-light whitespace-pre-line">${cleanDesc || ''}</p>
+          </div>
+          
+          <div class="flex justify-between items-center pt-2">
+            <span class="text-xs font-bold text-wood-orange">💌 ${approvedCount} คำอวยพร</span>
+            ${startDate > now
+              ? `<button class="sketch-btn btn-cream text-xs py-1 px-3 opacity-60 btn-upcoming-lock">
+                   ⏳ ยังไม่เริ่มจัดงาน
+                 </button>`
+              : endDate < now
+                ? `<button class="sketch-btn btn-cream text-xs py-1 px-3 opacity-60 btn-ended-lock">
+                     💾 สิ้นสุดเทศกาลแล้ว
+                   </button>`
+                : `<a href="/message/${festival.id}" class="sketch-btn btn-yellow text-xs py-1 px-3">
+                     🎲 สุ่มรับคำอวยพร
+                   </a>`
+            }
+          </div>
+        </div>
+      </div>
+    `;
+  }).join('');
+  
+  adjustDescriptions();
+}
+
+// Attach Live Search input listeners
+function setupSearchFilter() {
+  const searchInput = document.getElementById('archive-search');
+  searchInput?.addEventListener('input', (e) => {
+    const term = e.target.value.toLowerCase().trim();
+    if (!term) {
+      renderArchiveList(archivedFestivals);
+      return;
+    }
+    
+    const filtered = archivedFestivals.filter(f => 
+      f.name.toLowerCase().includes(term) || 
+      (f.description && f.description.toLowerCase().includes(term))
+    );
+    renderArchiveList(filtered);
+  });
+}
+
+// Date Formatting Helper
+function formatDate(dateStr, isAnnual) {
+  const date = new Date(dateStr);
+  return date.toLocaleDateString('th-TH', {
+    day: 'numeric',
+    month: 'short'
+  });
+}
+
+function getFestivalDates(festival) {
+  const now = new Date();
+  let startDate = new Date(festival.start_date);
+  let endDate = new Date(festival.end_date);
+  const isAnnual = festival.description && festival.description.startsWith('[ประจำปี]');
+  
+  if (isAnnual) {
+    const currentYear = now.getFullYear();
+    startDate.setFullYear(currentYear);
+    endDate.setFullYear(currentYear);
+    
+    if (startDate > endDate) {
+      if (now >= startDate) {
+        endDate.setFullYear(currentYear + 1);
+      } else if (now <= endDate) {
+        startDate.setFullYear(currentYear - 1);
+      } else {
+        endDate.setFullYear(currentYear + 1);
+      }
+    } else {
+      if (now > endDate) {
+        startDate.setFullYear(currentYear + 1);
+        endDate.setFullYear(currentYear + 1);
+      }
+    }
   }
-  #slider-prev {
-    left: 50% !important;
-    margin-left: -56px !important;
-  }
-  #slider-next {
-    right: 50% !important;
-    margin-right: -56px !important;
-  }
-  #slider-prev:hover,
-  #slider-next:hover {
-    transform: scale(1.05) !important;
-    background-color: #d2bc92 !important;
-  }
-  #slider-prev:active,
-  #slider-next:active {
-    transform: scale(0.95) !important;
-  }
+  
+  return { startDate, endDate, isAnnual };
 }
 
-/* Custom Card Paper Patterns */
-#paper-pattern-overlay {
-  opacity: 0.45 !important;
-}
-
-/* 1. Lined pattern */
-.pattern-lined {
-  background-image: linear-gradient(#dbcaab 1px, transparent 1px) !important;
-  background-size: 100% 28px !important;
-  line-height: 28px !important;
-}
-
-/* 2. Grid pattern */
-.pattern-grid {
-  background-image: 
-    linear-gradient(#dbcaab 1px, transparent 1px),
-    linear-gradient(90deg, #dbcaab 1px, transparent 1px) !important;
-  background-size: 20px 20px !important;
-}
-
-/* 3. Wood Frame pattern */
-.pattern-wood-frame {
-  border: 12px double #b17a50 !important;
-  outline: 3px solid var(--color-pencil) !important;
-  outline-offset: -12px !important;
-}
-
-/* 4. Washi Tape pattern */
-.pattern-washi-tape {
-  opacity: 1 !important;
-}
-.pattern-washi-tape::before {
-  content: '';
-  position: absolute;
-  top: 10px;
-  left: -20px;
-  width: 80px;
-  height: 24px;
-  background-color: rgba(240, 195, 101, 0.65);
-  border: 1.5px dashed var(--color-pencil);
-  transform: rotate(-45deg);
-  pointer-events: none;
-  z-index: 20;
-}
-.pattern-washi-tape::after {
-  content: '';
-  position: absolute;
-  top: 10px;
-  right: -20px;
-  width: 80px;
-  height: 24px;
-  background-color: rgba(122, 168, 196, 0.65);
-  border: 1.5px dashed var(--color-pencil);
-  transform: rotate(45deg);
-  pointer-events: none;
-  z-index: 20;
-}
-
-/* 5. Botanical Vines pattern */
-.pattern-botanical {
-  border: 4px solid var(--color-pencil) !important;
-  opacity: 0.95 !important;
-}
-.pattern-botanical::before {
-  content: '🍃 🌿 🍃 🌿 🍃 🌿';
-  position: absolute;
-  top: 8px;
-  left: 0;
-  right: 0;
-  text-align: center;
-  font-size: 14px;
-  letter-spacing: 0.6rem;
-  opacity: 0.7;
-  pointer-events: none;
-  z-index: 20;
-}
-.pattern-botanical::after {
-  content: '🌿 🍃 🌿 🍃 🌿 🍃';
-  position: absolute;
-  bottom: 8px;
-  left: 0;
-  right: 0;
-  text-align: center;
-  font-size: 14px;
-  letter-spacing: 0.6rem;
-  opacity: 0.7;
-  pointer-events: none;
-  z-index: 20;
-}
-
-/* 6. Vintage Ticket pattern */
-.pattern-ticket {
-  border: 3px dashed var(--color-pencil) !important;
-  opacity: 0.95 !important;
-}
-.pattern-ticket::before {
-  content: '';
-  position: absolute;
-  top: 50%;
-  left: -14px;
-  transform: translateY(-50%);
-  width: 24px;
-  height: 24px;
-  background-color: #d7b899; /* Desk color */
-  border: 3px solid var(--color-pencil);
-  border-radius: 50%;
-  z-index: 20;
-  pointer-events: none;
-}
-.pattern-ticket::after {
-  content: '';
-  position: absolute;
-  top: 50%;
-  right: -14px;
-  transform: translateY(-50%);
-  width: 24px;
-  height: 24px;
-  background-color: #d7b899; /* Desk color */
-  border: 3px solid var(--color-pencil);
-  border-radius: 50%;
-  z-index: 20;
-  pointer-events: none;
-}
-
-/* 7. Magical Sparkles pattern */
-.pattern-sparkles {
-  opacity: 0.95 !important;
-}
-.pattern-sparkles::before {
-  content: '✨  ✨  ✨  ✨  ✨';
-  position: absolute;
-  top: 8px;
-  left: 10px;
-  right: 10px;
-  display: flex;
-  justify-content: space-around;
-  font-size: 14px;
-  opacity: 0.6;
-  pointer-events: none;
-  z-index: 20;
-}
-.pattern-sparkles::after {
-  content: '✨  ✨  ✨  ✨  ✨';
-  position: absolute;
-  bottom: 8px;
-  left: 10px;
-  right: 10px;
-  display: flex;
-  justify-content: space-around;
-  font-size: 14px;
-  opacity: 0.6;
-  pointer-events: none;
-  z-index: 20;
-}
-
-/* --- Colored Pencils Styles --- */
-#pencil-holder-case,
-#text-pencil-holder-case {
-  background-color: #f7eedb; /* Warm wood tray tone */
-  border: 3px solid var(--color-pencil);
-  border-radius: 16px 16px 10px 10px;
-  box-shadow: inset 0 -8px 0 rgba(74, 60, 49, 0.1), 4px 4px 0px 0px var(--color-pencil);
-  padding: 2.2rem 1.2rem 0.8rem 1.2rem;
-  display: flex;
-  justify-content: center;
-  align-items: flex-end;
-  gap: 16px; /* Spaced out comfortably to prevent eye fatigue */
-  min-height: 150px;
-  position: relative;
-  overflow-x: auto;
-  overflow-y: hidden;
-  white-space: nowrap;
-}
-
-#pencil-holder-case::-webkit-scrollbar,
-#text-pencil-holder-case::-webkit-scrollbar {
-  height: 6px;
-}
-
-#pencil-holder-case::-webkit-scrollbar-track,
-#text-pencil-holder-case::-webkit-scrollbar-track {
-  background: transparent;
-}
-
-#pencil-holder-case::-webkit-scrollbar-thumb,
-#text-pencil-holder-case::-webkit-scrollbar-thumb {
-  background: var(--color-pencil-soft);
-  border-radius: 3px;
-}
-
-@media (max-width: 640px) {
-  #pencil-holder-case,
-  #text-pencil-holder-case {
-    justify-content: flex-start;
-  }
-}
-
-.pencil-item {
-  width: 24px;
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  cursor: pointer;
-  transition: transform 0.2s cubic-bezier(0.175, 0.885, 0.32, 1.275), filter 0.2s ease;
-  position: relative;
-  flex-shrink: 0; /* Prevent pencils from squeezing together and looking dizzy */
-}
-
-.pencil-item:hover {
-  transform: translateY(-8px);
-}
-
-.pencil-item.active {
-  transform: translateY(-16px);
-  filter: drop-shadow(0px 6px 4px rgba(74, 60, 49, 0.25));
-}
-
-.pencil-tip {
-  width: 0;
-  height: 0;
-  border-left: 8px solid transparent;
-  border-right: 8px solid transparent;
-  border-bottom: 14px solid #ebdcb9; /* Shaved wood color */
-  position: relative;
-}
-
-.pencil-lead {
-  width: 0;
-  height: 0;
-  border-left: 4px solid transparent;
-  border-right: 4px solid transparent;
-  border-bottom: 7px solid currentColor;
-  position: absolute;
-  top: 7px;
-  left: -4px;
-}
-
-.pencil-body {
-  width: 16px;
-  height: 80px;
-  border: 2px solid var(--color-pencil);
-  border-top: none;
-  border-bottom-left-radius: 4px;
-  border-bottom-right-radius: 4px;
-  box-sizing: border-box;
-  /* 3D cylindrical wood texture lines */
-  background-image: linear-gradient(90deg, rgba(255, 255, 255, 0.25) 0%, rgba(255, 255, 255, 0.25) 30%, rgba(0, 0, 0, 0) 30%, rgba(0, 0, 0, 0) 70%, rgba(0, 0, 0, 0.15) 70%);
-}
-
-/* Edit and Delete buttons for custom pencils */
-.pencil-actions {
-  position: absolute;
-  top: -16px;
-  display: flex;
-  gap: 2px;
-  opacity: 0;
-  pointer-events: none;
-  transition: opacity 0.15s ease;
-  z-index: 30;
-}
-
-.pencil-item:hover .pencil-actions,
-.pencil-item.active .pencil-actions {
-  opacity: 1;
-  pointer-events: auto;
-}
-
-.pencil-action-btn {
-  width: 16px;
-  height: 16px;
-  border: 1.5px solid var(--color-pencil);
-  border-radius: 50%;
-  font-size: 9px;
-  font-weight: 950;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  box-shadow: 1px 1px 0px 0px var(--color-pencil);
-  cursor: pointer;
-}
-
-.pencil-action-btn.edit {
-  background-color: var(--color-wood-yellow);
-}
-
-.pencil-action-btn.delete {
-  background-color: var(--color-wood-red);
-}
-
-/* Custom Color Picker Input Styling */
-#user-color-picker {
-  -webkit-appearance: none;
-  border: 4px solid #4a3c31 !important;
-  border-radius: 50%;
-  padding: 0;
-  cursor: pointer;
-  overflow: hidden;
-}
-
-#user-color-picker::-webkit-color-swatch-wrapper {
-  padding: 0;
-  border-radius: 50%;
-}
-
-#user-color-picker::-webkit-color-swatch {
-  border: none;
-  border-radius: 50%;
-}
-
-#user-color-picker::-moz-color-swatch {
-  border: none;
-  border-radius: 50%;
-}
-
-/* Smooth Slider Transitions (Plan 2) */
-.slide-fade-in {
-  opacity: 1 !important;
-  transform: translateY(0) scale(1) rotate(0deg) !important;
-  transition: opacity 0.5s ease-out, transform 0.5s ease-out !important;
-}
-
-.slide-fade-out {
-  opacity: 0 !important;
-  transform: translateY(6px) scale(0.97) rotate(-0.5deg) !important;
-  transition: opacity 0.4s ease-in, transform 0.4s ease-in !important;
-}
-
-/* Toast FadeOut Animation */
-.toast-fadeOut {
-  animation: fadeOut 0.4s ease forwards !important;
-}
-
-@keyframes fadeOut {
-  from {
-    transform: translateY(0) scale(1);
-    opacity: 1;
-  }
-  to {
-    transform: translateY(20px) scale(0.9);
-    opacity: 0;
-  }
-}
-
-/* Floating Chat Widget & Conversation bubble styles (Plan 1) */
-.chat-bubble-sent {
-  background-color: var(--color-wood-green);
-  color: var(--color-pencil);
-  align-self: flex-end;
-  border: 2px solid var(--color-pencil);
-  border-radius: 18px 18px 4px 18px;
-  padding: 0.5rem 1rem;
-  max-width: 80%;
-  box-shadow: 2px 2px 0px 0px var(--color-pencil);
-  position: relative;
-  word-break: break-word;
-}
-
-.chat-bubble-received {
-  background-color: var(--color-paper);
-  color: var(--color-pencil);
-  align-self: flex-start;
-  border: 2px solid var(--color-pencil);
-  border-radius: 18px 18px 18px 4px;
-  padding: 0.5rem 1rem;
-  max-width: 80%;
-  box-shadow: 2px 2px 0px 0px var(--color-pencil);
-  position: relative;
-  word-break: break-word;
-}
-
-#chat-messages-list::-webkit-scrollbar {
-  width: 6px;
-}
-#chat-messages-list::-webkit-scrollbar-track {
-  background: transparent;
-}
-#chat-messages-list::-webkit-scrollbar-thumb {
-  background: var(--color-pencil-light);
-  border-radius: 4px;
-  border: none;
-}
-
-/* Custom Flex and Layouts for Chat (Plan 1) */
-.chat-header-container {
-  display: flex !important;
-  align-items: center !important;
-  gap: 10px !important;
-}
-
-.chat-avatar-circle {
-  flex-shrink: 0 !important;
-  width: 32px !important;
-  height: 32px !important;
-  border-radius: 50% !important;
-  border: 2px solid var(--color-pencil) !important;
-  background-color: white !important;
-  display: flex !important;
-  align-items: center !important;
-  justify-content: center !important;
-  font-size: 14px !important;
-}
-
-.chat-header-text {
-  display: flex !important;
-  flex-direction: column !important;
-  justify-content: center !important;
-}
-
-/* --- Miniature Paper Sheets Style System --- */
-#paper-sheets-case {
-  background-color: #f7eedb; /* Warm wood tray tone to match pencil case */
-  border: 3px solid var(--color-pencil);
-  border-radius: 16px;
-  box-shadow: inset 0 -8px 0 rgba(74, 60, 49, 0.05), 4px 4px 0px 0px var(--color-pencil);
-  padding: 1.5rem 1.2rem;
-  display: flex;
-  justify-content: center;
-  align-items: center;
-  min-height: 120px;
-  position: relative;
-  overflow-x: auto;
-  overflow-y: hidden;
-  white-space: nowrap;
-}
-
-#paper-sheets-case::-webkit-scrollbar {
-  height: 6px;
-}
-#paper-sheets-case::-webkit-scrollbar-track {
-  background: transparent;
-}
-#paper-sheets-case::-webkit-scrollbar-thumb {
-  background: var(--color-pencil-soft);
-  border-radius: 3px;
-}
-
-@media (max-width: 640px) {
-  #paper-sheets-case {
-    justify-content: flex-start;
-    padding-left: 20px;
-  }
-}
-
-.paper-sheet-item {
-  width: 56px;
-  height: 80px;
-  margin-left: -15px; /* Premium overlapping fan layout */
-  position: relative;
-  transition: transform 0.2s cubic-bezier(0.175, 0.885, 0.32, 1.275), box-shadow 0.2s ease, z-index 0.15s ease;
-  cursor: pointer;
-  z-index: 10;
-  flex-shrink: 0;
-}
-
-.paper-sheet-item:first-child {
-  margin-left: 0;
-}
-
-/* Offset stack elevations slightly to look like a real paper deck */
-.paper-sheet-item:nth-child(even) {
-  transform: rotate(1deg) translateY(1px);
-}
-.paper-sheet-item:nth-child(odd) {
-  transform: rotate(-1.5deg) translateY(-1px);
-}
-
-.paper-sheet-body {
-  width: 100%;
-  height: 100%;
-  border: 2px solid var(--color-pencil);
-  border-radius: 4px 6px 3px 5px/5px 3px 6px 4px; /* Organic sketchbook corners */
-  box-shadow: 2px 2px 0px 0px var(--color-pencil);
-  box-sizing: border-box;
-  /* Paper grain effect */
-  background-image: linear-gradient(135deg, rgba(255, 255, 255, 0.2) 0%, rgba(0, 0, 0, 0.04) 100%);
-}
-
-.paper-sheet-item:hover {
-  transform: translateY(-12px) scale(1.05) rotate(-3deg) !important;
-  z-index: 40 !important;
-  box-shadow: 0px 8px 12px rgba(74, 60, 49, 0.15);
-}
-
-.paper-sheet-item.active {
-  transform: translateY(-20px) scale(1.08) rotate(4deg) !important;
-  z-index: 35 !important;
-  filter: drop-shadow(0px 8px 6px rgba(74, 60, 49, 0.2));
-}
-
-.paper-sheet-item.active .paper-sheet-body {
-  border-color: #e09f3e; /* Selected state highlight color */
-  border-width: 3px;
-  box-shadow: 3px 3px 0px 0px var(--color-pencil);
-}
-
-/* Add Custom Paper button */
-.paper-sheet-plus .paper-sheet-body {
-  border-style: dashed;
-  background-color: rgba(235, 220, 185, 0.3);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  color: var(--color-pencil);
-  font-weight: 800;
-  font-size: 1.5rem;
-  box-shadow: 1.5px 1.5px 0px 0px var(--color-pencil);
-}
-
-.paper-sheet-plus:hover .paper-sheet-body {
-  background-color: rgba(240, 195, 101, 0.25);
-  border-style: solid;
-}
-
-/* Floating edit/delete buttons for custom paper sheets */
-.paper-sheet-actions {
-  position: absolute;
-  top: -12px;
-  left: 50%;
-  transform: translateX(-50%);
-  display: flex;
-  gap: 3px;
-  opacity: 0;
-  pointer-events: none;
-  transition: opacity 0.15s ease;
-  z-index: 50;
-}
-
-.paper-sheet-item:hover .paper-sheet-actions,
-.paper-sheet-item.active .paper-sheet-actions {
-  opacity: 1;
-  pointer-events: auto;
-}
-
-/* Card Flip Animation for Message Drawing */
-@keyframes card-flip-anim {
-  0% { transform: scale(0.95) rotateY(0deg); opacity: 0.8; }
-  50% { transform: scale(1.02) rotateY(15deg) translateY(-5px); opacity: 1; }
-  100% { transform: scale(1) rotateY(0deg) translateY(0); opacity: 1; }
-}
-.card-flip {
-  animation: card-flip-anim 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+function adjustDescriptions() {
+  setTimeout(() => {
+    const descEls = document.querySelectorAll('.festival-desc');
+    descEls.forEach(descEl => {
+      // Check if button is already added
+      if (descEl.nextElementSibling && descEl.nextElementSibling.classList.contains('btn-toggle-desc')) {
+        return;
+      }
+      
+      const isTruncated = descEl.scrollHeight > descEl.clientHeight;
+      if (isTruncated) {
+        const toggleBtn = document.createElement('button');
+        toggleBtn.type = 'button';
+        toggleBtn.className = 'btn-toggle-desc sketch-btn px-3.5 py-1.5 text-xs font-bold mt-2 shadow-[2px_2px_0px_0px_#4a3c31]';
+        toggleBtn.style.cssText = 'background-color: black !important; color: white !important; border-color: black !important;';
+        toggleBtn.textContent = 'ดูเพิ่มเติม';
+        
+        descEl.parentNode.insertBefore(toggleBtn, descEl.nextSibling);
+        
+        toggleBtn.addEventListener('click', (e) => {
+          e.preventDefault();
+          if (descEl.classList.contains('line-clamp-5')) {
+            descEl.classList.remove('line-clamp-5');
+            descEl.classList.add('line-clamp-none');
+            toggleBtn.textContent = 'ย่อ';
+          } else {
+            descEl.classList.remove('line-clamp-none');
+            descEl.classList.add('line-clamp-5');
+            toggleBtn.textContent = 'ดูเพิ่มเติม';
+          }
+        });
+      }
+    });
+  }, 100);
 }
