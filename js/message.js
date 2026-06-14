@@ -1,5 +1,5 @@
 // MyFestival - Message Randomizer and Detail Controller
-import { getSupabase } from './supabase.js';
+import { getSupabase, parseMessageTags } from './supabase.js';
 import { getCurrentUser } from './auth.js';
 import { checkUserLike, toggleLike, getLikesCount } from './like.js';
 import { checkUserSave, toggleSave } from './saved.js';
@@ -41,8 +41,7 @@ export const init = async (params) => {
     if (festival) {
       currentFestival = festival;
       const now = new Date();
-      const startDate = new Date(festival.start_date);
-      const endDate = new Date(festival.end_date);
+      const { startDate, endDate } = getFestivalDates(festival);
       if (startDate > now) {
         renderErrorState('เทศกาลนี้ยังไม่ถึงเวลาเริ่มจัดงาน ไม่สามารถสุ่มเปิดรับคำอวยพรล่วงหน้าได้ครับ ⏳');
         return;
@@ -79,6 +78,8 @@ async function loadSpecificMessage(messageId) {
       return;
     }
 
+    parseMessageTags(message);
+
     // Check if the message is approved. If not, only contributor or admin can view
     if (message.status !== 'approved' && message.contributor_id !== currentUserId) {
       // Check if admin
@@ -94,7 +95,7 @@ async function loadSpecificMessage(messageId) {
 
     if (currentFestival) {
       const now = new Date();
-      const startDate = new Date(currentFestival.start_date);
+      const { startDate } = getFestivalDates(currentFestival);
       if (startDate > now) {
         renderErrorState('เทศกาลของคำอวยพรนี้ยังไม่ถึงเวลาเริ่มจัดงาน ไม่สามารถเข้าชมได้ครับ ⏳');
         return;
@@ -102,6 +103,9 @@ async function loadSpecificMessage(messageId) {
     }
 
     document.getElementById('festival-title').textContent = `🎈 ${currentFestival.name}`;
+    if (currentFestival) {
+      fetchAndPopulateTagsGuide(currentFestival.id);
+    }
     await renderMessageCard();
   } catch (error) {
     console.error('Error loading specific message:', error);
@@ -122,6 +126,24 @@ async function drawRandomMessage(festivalId) {
       .eq('status', 'approved');
 
     if (msgError) throw msgError;
+
+    if (allMessages) {
+      allMessages.forEach(parseMessageTags);
+    }
+
+    // Collect all unique tags for the dropdown guide
+    const uniqueTags = new Set();
+    if (allMessages) {
+      allMessages.forEach(m => {
+        if (m.tags) {
+          m.tags.split(',').forEach(tag => {
+            const clean = tag.trim();
+            if (clean) uniqueTags.add(clean);
+          });
+        }
+      });
+    }
+    updateTagsGuide(Array.from(uniqueTags));
 
     if (!allMessages || allMessages.length === 0) {
       renderEmptyState();
@@ -580,6 +602,119 @@ function renderEmptyState() {
         </div>
       </div>
     `;
+  }
+}
+
+function getFestivalDates(festival) {
+  const now = new Date();
+  let startDate = new Date(festival.start_date);
+  let endDate = new Date(festival.end_date);
+  const isAnnual = festival.description && festival.description.startsWith('[ประจำปี]');
+  
+  if (isAnnual) {
+    const currentYear = now.getFullYear();
+    startDate.setFullYear(currentYear);
+    endDate.setFullYear(currentYear);
+    
+    if (startDate > endDate) {
+      if (now >= startDate) {
+        endDate.setFullYear(currentYear + 1);
+      } else if (now <= endDate) {
+        startDate.setFullYear(currentYear - 1);
+      } else {
+        endDate.setFullYear(currentYear + 1);
+      }
+    } else {
+      if (now > endDate) {
+        startDate.setFullYear(currentYear + 1);
+        endDate.setFullYear(currentYear + 1);
+      }
+    }
+  }
+  
+  return { startDate, endDate, isAnnual };
+}
+
+// Populate datalist dropdown autocomplete options and tag buttons under the filter input
+function updateTagsGuide(tagsList) {
+  const datalist = document.getElementById('festival-tags-list');
+  const guideContainer = document.getElementById('recommended-tags-container');
+  if (!datalist) return;
+
+  // 1. Populate native datalist options
+  datalist.innerHTML = tagsList.map(tag => `<option value="${tag}"></option>`).join('');
+
+  // 2. Populate interactive tag recommendation buttons
+  if (guideContainer) {
+    if (tagsList.length === 0) {
+      guideContainer.innerHTML = '';
+      return;
+    }
+    guideContainer.innerHTML = `
+      <span class="text-[10px] font-bold text-pencil-light self-center mr-1">แท็กในเทศกาลนี้:</span>
+      <div class="flex flex-wrap gap-1.5 justify-end">
+        ${tagsList.map(tag => `
+          <button data-tag="${tag}" class="btn-tag-guide sketch-badge btn-cream text-[10px] font-bold py-0.5 px-2 hover:bg-wood-yellow/30 active:scale-95 transition-all">
+            #${tag}
+          </button>
+        `).join('')}
+      </div>
+    `;
+
+    // Attach click listeners to tags guide buttons
+    guideContainer.querySelectorAll('.btn-tag-guide').forEach(btn => {
+      btn.addEventListener('click', () => {
+        const tagFilterInput = document.getElementById('tag-filter-input');
+        if (tagFilterInput) {
+          tagFilterInput.value = btn.getAttribute('data-tag');
+          // Trigger input event to filter wishes
+          tagFilterInput.dispatchEvent(new Event('input'));
+        }
+      });
+    });
+  }
+}
+
+// Fetch all approved wishes for a festival and extract unique tags to populate the guides
+async function fetchAndPopulateTagsGuide(festivalId) {
+  const supabase = await getSupabase();
+  let allMessages = [];
+  try {
+    if (supabase) {
+      const { data } = await supabase
+        .from('messages')
+        .select('message_text')
+        .eq('festival_id', festivalId)
+        .eq('status', 'approved');
+      allMessages = data || [];
+    } else {
+      throw new Error('Supabase client not configured');
+    }
+  } catch (err) {
+    console.warn('Error fetching tags for guide from Supabase, using mock:', err);
+    const mockWishes = localStorage.getItem('myfestival_mock_wishes');
+    if (mockWishes) {
+      try {
+        const wishes = JSON.parse(mockWishes);
+        allMessages = wishes.filter(w => w.festival_id === festivalId && w.status === 'approved');
+      } catch (e) {
+        console.error('Error parsing mock wishes:', e);
+      }
+    }
+  }
+  
+  if (allMessages) {
+    allMessages.forEach(parseMessageTags);
+    const uniqueTags = new Set();
+    allMessages.forEach(m => {
+      if (m.tags) {
+        m.tags.split(',').forEach(tag => {
+          const clean = tag.trim();
+          if (clean) uniqueTags.add(clean);
+        });
+      }
+    });
+    updateTagsGuide(Array.from(uniqueTags));
   }
 }
 
