@@ -1,5 +1,5 @@
 // MyFestival - Admin Dashboard Controller
-import { getSupabase } from './supabase.js';
+import { getSupabase, parseMessageTags, serializeMessageTags } from './supabase.js';
 import { getCurrentUser } from './auth.js';
 import { showToast, navigate } from './router.js';
 
@@ -428,6 +428,10 @@ async function loadApprovalTab() {
       .eq('status', 'pending')
       .order('created_at', { ascending: true });
       
+    if (newWishes) {
+      newWishes.forEach(parseMessageTags);
+    }
+    
     if (errWishes) throw errWishes;
     
     const { data: revisions, error: errRevisions } = await supabase
@@ -435,6 +439,15 @@ async function loadApprovalTab() {
       .select('*, messages(id, message_text, signature, is_anonymous, festivals(name), profiles(full_name, email))')
       .eq('status', 'pending')
       .order('created_at', { ascending: true });
+      
+    if (revisions) {
+      revisions.forEach(rev => {
+        parseMessageTags(rev);
+        if (rev.messages) {
+          parseMessageTags(rev.messages);
+        }
+      });
+    }
       
     if (errRevisions) throw errRevisions;
 
@@ -462,6 +475,15 @@ async function loadApprovalTab() {
     console.warn('Error fetching approval queue, falling back to mock:', error);
     const newWishes = getMockData('wishes', initialMockWishes).filter(w => w.status === 'pending');
     const revisions = getMockData('revisions', initialMockRevisions).filter(r => r.status === 'pending');
+    
+    if (newWishes) newWishes.forEach(parseMessageTags);
+    if (revisions) {
+      revisions.forEach(rev => {
+        parseMessageTags(rev);
+        if (rev.messages) parseMessageTags(rev.messages);
+      });
+    }
+
     const suggestions = getMockData('suggestions', initialMockSuggestions).filter(s => s.status === 'pending');
     const nameChanges = getMockData('name_changes', []).filter(n => n.pending_name);
     renderNewWishesQueue(newWishes);
@@ -492,6 +514,24 @@ function renderNewWishesQueue(wishes) {
             <span class="text-xs text-pencil-light font-bold">✍️ ผู้เขียน: ${writerName} (ลายเซ็น: ${sig})</span>
           </div>
           <p class="text-base font-bold italic leading-relaxed">"${wish.message_text}"</p>
+          ${(() => {
+            if (wish.tags) {
+              const tagList = wish.tags.split(',').map(t => t.trim()).filter(Boolean);
+              if (tagList.length > 0) {
+                return `
+                  <div class="flex flex-wrap gap-1.5 mt-1.5 mb-1">
+                    ${tagList.map(t => `
+                      <span class="sketch-badge btn-cream text-[10px] font-bold py-0.5 px-2 flex items-center gap-1 select-none">
+                        #${t}
+                        <button data-wish-id="${wish.id}" data-tag-name="${t}" data-type="new" class="btn-delete-tag font-black hover:text-wood-red transition duration-150" title="ลบแท็กนี้">✕</button>
+                      </span>
+                    `).join('')}
+                  </div>
+                `;
+              }
+            }
+            return '';
+          })()}
         </div>
         
         <div class="flex gap-2 self-end md:self-center">
@@ -505,6 +545,16 @@ function renderNewWishesQueue(wishes) {
       </div>
     `;
   }).join('');
+  
+  // Attach event listeners for delete tags
+  container.querySelectorAll('.btn-delete-tag').forEach(btn => {
+    btn.addEventListener('click', async (e) => {
+      e.stopPropagation();
+      const wishId = btn.getAttribute('data-wish-id');
+      const tagName = btn.getAttribute('data-tag-name');
+      await handleDeleteWishTag(wishId, tagName, 'new');
+    });
+  });
   
   // Attach event listeners
   container.querySelectorAll('.btn-approve-new').forEach(btn => {
@@ -550,12 +600,47 @@ function renderRevisionsQueue(revisions) {
           <div class="bg-pencil-soft/20 border-2 border-dashed border-pencil p-3 rounded-lg">
             <p class="text-xs text-pencil-light font-black uppercase mb-1">ข้อความเดิมที่แสดงอยู่:</p>
             <p class="text-sm font-bold italic">"${orig.message_text}"</p>
+            ${(() => {
+              if (orig.tags) {
+                const tagList = orig.tags.split(',').map(t => t.trim()).filter(Boolean);
+                if (tagList.length > 0) {
+                  return `
+                    <div class="flex flex-wrap gap-1.5 mt-1.5 mb-1.5">
+                      ${tagList.map(t => `
+                        <span class="sketch-badge btn-cream text-[10px] font-bold py-0.5 px-2 select-none">
+                          #${t}
+                        </span>
+                      `).join('')}
+                    </div>
+                  `;
+                }
+              }
+              return '';
+            })()}
             <p class="text-xs text-pencil-light font-bold mt-2">✍️ ลายเซ็นเดิม: ${origSig}</p>
           </div>
           <!-- Revision -->
           <div class="bg-wood-yellow/10 border-2 border-pencil p-3 rounded-lg">
             <p class="text-xs text-wood-orange font-black uppercase mb-1">ขอแก้ไขเป็นข้อความใหม่:</p>
             <p class="text-sm font-bold italic text-wood-orange">"${rev.message_text}"</p>
+            ${(() => {
+              if (rev.tags) {
+                const tagList = rev.tags.split(',').map(t => t.trim()).filter(Boolean);
+                if (tagList.length > 0) {
+                  return `
+                    <div class="flex flex-wrap gap-1.5 mt-1.5 mb-1.5">
+                      ${tagList.map(t => `
+                        <span class="sketch-badge btn-cream text-[10px] font-bold py-0.5 px-2 flex items-center gap-1 select-none">
+                          #${t}
+                          <button data-wish-id="${rev.id}" data-tag-name="${t}" data-type="revision" class="btn-delete-tag font-black hover:text-wood-red transition duration-150" title="ลบแท็กนี้">✕</button>
+                        </span>
+                      `).join('')}
+                    </div>
+                  `;
+                }
+              }
+              return '';
+            })()}
             <p class="text-xs text-pencil-light font-bold mt-2">✍️ ลายเซ็นใหม่: ${newSig}</p>
           </div>
         </div>
@@ -571,6 +656,16 @@ function renderRevisionsQueue(revisions) {
       </div>
     `;
   }).join('');
+  
+  // Attach event listeners for delete tags
+  container.querySelectorAll('.btn-delete-tag').forEach(btn => {
+    btn.addEventListener('click', async (e) => {
+      e.stopPropagation();
+      const wishId = btn.getAttribute('data-wish-id');
+      const tagName = btn.getAttribute('data-tag-name');
+      await handleDeleteWishTag(wishId, tagName, 'revision');
+    });
+  });
   
   // Attach event listeners
   container.querySelectorAll('.btn-approve-rev').forEach(btn => {
@@ -956,15 +1051,19 @@ function renderAdminFestivalsList(festivals) {
   
   container.innerHTML = festivals.map(f => {
     const count = f.messages?.length || 0;
+    const isAnnual = f.description && f.description.startsWith('[ประจำปี]');
+    const cleanDesc = isAnnual ? f.description.replace('[ประจำปี]', '').trim() : f.description;
+    
     const startStr = new Date(f.start_date).toLocaleString('th-TH');
     const endStr = new Date(f.end_date).toLocaleString('th-TH');
+    const dateRangeStr = isAnnual ? `${startStr} ถึง ${endStr} (ประจำปี)` : `${startStr} ถึง ${endStr}`;
     
     return `
       <div class="sketch-card p-3 bg-white flex justify-between items-center gap-4">
         <div>
           <h3 class="font-extrabold text-base">${f.name}</h3>
-          <p class="text-xs text-pencil-light font-bold">🗓️ ${startStr} ถึง ${endStr}</p>
-          <p class="text-xs text-pencil-light mt-1">${f.description || ''}</p>
+          <p class="text-xs text-pencil-light font-bold">🗓️ ${dateRangeStr}</p>
+          <p class="text-xs text-pencil-light mt-1">${cleanDesc || ''}</p>
         </div>
         <div class="flex flex-col items-end gap-2 shrink-0">
           <span class="sketch-badge btn-yellow text-xs font-black">💌 ${count} ข้อความ</span>
@@ -1015,9 +1114,15 @@ async function enterEditFestivalMode(id) {
   }
   
   // Populate form fields
+  const isAnnual = festival.description && festival.description.startsWith('[ประจำปี]');
+  const cleanDesc = isAnnual ? festival.description.replace('[ประจำปี]', '').trim() : festival.description;
+
   document.getElementById('fest-id').value = festival.id;
   document.getElementById('fest-name').value = festival.name;
-  document.getElementById('fest-desc').value = festival.description || '';
+  document.getElementById('fest-desc').value = cleanDesc || '';
+  
+  const annualCheckbox = document.getElementById('fest-annual');
+  if (annualCheckbox) annualCheckbox.checked = isAnnual;
   
   // Update image preview
   currentFestivalImageUrl = festival.image_url || null;
@@ -1144,7 +1249,9 @@ function setupFestivalForm() {
     
     const id = document.getElementById('fest-id').value;
     const name = document.getElementById('fest-name').value.trim();
-    const desc = document.getElementById('fest-desc').value.trim();
+    const rawDesc = document.getElementById('fest-desc').value.trim();
+    const isAnnual = document.getElementById('fest-annual')?.checked || false;
+    const desc = isAnnual ? `[ประจำปี] ${rawDesc}` : rawDesc;
     const image = currentFestivalImageUrl;
     const start = document.getElementById('fest-start').value;
     const end = document.getElementById('fest-end').value;
@@ -1855,7 +1962,7 @@ function renderMembersList(profiles) {
           else if (profile.role === 'contributor') roleColor = 'btn-yellow';
 
           return `
-            <div class="sketch-card p-4 bg-white flex flex-col items-center text-center space-y-3 relative hover-wiggle text-pencil">
+            <div class="sketch-card p-4 bg-white flex flex-col items-center text-center space-y-3 relative text-pencil">
               <div class="w-16 h-16 rounded-full border-3 border-pencil flex items-center justify-center text-2xl font-black bg-cream shadow-[2px_2px_0px_0px_#4a3c31]">
                 ${firstChar}
               </div>
@@ -2339,6 +2446,10 @@ async function loadWishesTab() {
     allWishes = getMockData('wishes', initialMockWishes);
   }
   
+  if (allWishes) {
+    allWishes.forEach(parseMessageTags);
+  }
+  
   renderWishesList(allWishes);
   setupWishesSearch(allWishes);
 }
@@ -2390,6 +2501,24 @@ function renderWishesList(wishes) {
             <span class="text-[10px] text-pencil-light font-bold">${dateStr}</span>
           </div>
           <p class="text-sm font-bold italic leading-relaxed">"${w.message_text}"</p>
+          ${(() => {
+            if (w.tags) {
+              const tagList = w.tags.split(',').map(t => t.trim()).filter(Boolean);
+              if (tagList.length > 0) {
+                return `
+                  <div class="flex flex-wrap gap-1.5 mt-1.5 mb-1">
+                    ${tagList.map(t => `
+                      <span class="sketch-badge btn-cream text-[10px] font-bold py-0.5 px-2 flex items-center gap-1 select-none">
+                        #${t}
+                        <button data-wish-id="${w.id}" data-tag-name="${t}" data-type="wishlist" class="btn-delete-tag font-black hover:text-wood-red transition duration-150" title="ลบแท็กนี้">✕</button>
+                      </span>
+                    `).join('')}
+                  </div>
+                `;
+              }
+            }
+            return '';
+          })()}
           <p class="text-xs text-pencil-light font-bold">✍️ ผู้เขียน: ${writerName} (ลายเซ็น: ${sig})</p>
           ${w.rejection_reason ? `
             <p class="text-[11px] font-bold text-wood-orange bg-wood-orange/10 border-2 border-pencil p-2 rounded">
@@ -2409,6 +2538,16 @@ function renderWishesList(wishes) {
       </div>
     `;
   }).join('');
+  
+  // Attach event listeners for delete tags
+  container.querySelectorAll('.btn-delete-tag').forEach(btn => {
+    btn.addEventListener('click', async (e) => {
+      e.stopPropagation();
+      const wishId = btn.getAttribute('data-wish-id');
+      const tagName = btn.getAttribute('data-tag-name');
+      await handleDeleteWishTag(wishId, tagName, 'wishlist');
+    });
+  });
   
   // Attach event listeners
   container.querySelectorAll('.btn-wish-request-edit').forEach(btn => {
@@ -3293,6 +3432,95 @@ function escapeHTML(str) {
       '"': '&quot;'
     }[tag] || tag)
   );
+}
+
+// Admin action to delete a single tag from a wish (either messages or message_revisions)
+async function handleDeleteWishTag(wishId, tagName, type) {
+  if (!confirm(`คุณแน่ใจหรือไม่ว่าต้องการลบแท็ก "#${tagName}" ออกจากข้อความนี้?`)) {
+    return;
+  }
+  
+  const supabase = await getSupabase();
+  let success = false;
+  let errorMsg = '';
+  
+  const isRevision = type === 'revision';
+  const table = isRevision ? 'message_revisions' : 'messages';
+  
+  try {
+    if (supabase) {
+      // 1. Fetch current record
+      const { data, error: fetchErr } = await supabase
+        .from(table)
+        .select('message_text')
+        .eq('id', wishId)
+        .maybeSingle();
+        
+      if (fetchErr) throw fetchErr;
+      if (!data) throw new Error('ไม่พบข้อความในระบบ');
+      
+      // 2. Parse current message_text
+      const tempObj = { message_text: data.message_text, tags: '' };
+      parseMessageTags(tempObj);
+      
+      // 3. Remove tagName from tags list
+      const tagList = tempObj.tags.split(',').map(t => t.trim()).filter(Boolean);
+      const updatedTagList = tagList.filter(t => t.toLowerCase() !== tagName.toLowerCase());
+      const updatedTags = updatedTagList.join(', ');
+      
+      // 4. Re-serialize message_text
+      const updatedMsgText = serializeMessageTags(tempObj.message_text, updatedTags);
+      
+      // 5. Update database
+      const { error: updateErr } = await supabase
+        .from(table)
+        .update({ message_text: updatedMsgText })
+        .eq('id', wishId);
+        
+      if (updateErr) throw updateErr;
+      success = true;
+    }
+  } catch (err) {
+    console.error('Failed to delete tag from Supabase:', err);
+    errorMsg = err.message || JSON.stringify(err);
+  }
+  
+  // Fallback / sync to mock data if failed or using mock
+  if (!success) {
+    try {
+      const mockKey = isRevision ? 'revisions' : 'wishes';
+      const initialMock = isRevision ? initialMockRevisions : initialMockWishes;
+      const list = getMockData(mockKey, initialMock);
+      const index = list.findIndex(item => item.id === wishId);
+      if (index !== -1) {
+        const tempObj = { message_text: list[index].message_text, tags: '' };
+        parseMessageTags(tempObj);
+        
+        const tagList = tempObj.tags.split(',').map(t => t.trim()).filter(Boolean);
+        const updatedTagList = tagList.filter(t => t.toLowerCase() !== tagName.toLowerCase());
+        const updatedTags = updatedTagList.join(', ');
+        
+        list[index].message_text = serializeMessageTags(tempObj.message_text, updatedTags);
+        saveMockData(mockKey, list);
+        success = true;
+      }
+    } catch (e) {
+      console.error('Error updating mock tags:', e);
+      errorMsg = e.message;
+    }
+  }
+  
+  if (success) {
+    showToast('ลบแท็กสำเร็จแล้ว!', 'success');
+    // Reload UI
+    if (type === 'wishlist') {
+      await loadWishesTab();
+    } else {
+      await loadApprovalTab();
+    }
+  } else {
+    showToast(`เกิดข้อผิดพลาดในการลบแท็ก: ${errorMsg}`, 'error');
+  }
 }
 
 export const cleanup = () => {
