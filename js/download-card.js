@@ -8,6 +8,9 @@ let currentWishId = null;
 let currentUser = null;
 let customColors = [];
 let editingColorIndex = null;
+let pickingColorTarget = 'paper'; // 'paper' or 'text'
+let customTextColors = [];
+let editingTextColorIndex = null;
 
 // Custom color coordinates slot layout mapped to the wooden palette curve (lower half)
 const customColorSlots = [
@@ -43,6 +46,9 @@ export const init = async () => {
   // Try loading guest cached colors synchronously so they render immediately
   const guestColors = localStorage.getItem('myfestival_custom_colors_guest');
   customColors = guestColors ? guestColors.split(',').map(c => c.trim()).filter(Boolean) : [];
+  
+  const guestTextColors = localStorage.getItem('myfestival_custom_text_colors_guest');
+  customTextColors = guestTextColors ? guestTextColors.split(',').map(c => c.trim()).filter(Boolean) : [];
   
   // Set up interactive customizer events immediately so UI is responsive
   setupCustomizerEvents();
@@ -205,13 +211,23 @@ async function loadCustomColors(supabase) {
       const localColors = localStorage.getItem(`myfestival_custom_colors_${currentUser.id}`);
       customColors = localColors ? localColors.split(',').map(c => c.trim()).filter(Boolean) : [];
     }
-  } else {
-    // Guest user fallback to LocalStorage
-    const guestColors = localStorage.getItem('myfestival_custom_colors_guest');
-    customColors = guestColors ? guestColors.split(',').map(c => c.trim()).filter(Boolean) : [];
+    } else {
+      // Guest user fallback to LocalStorage
+      const guestColors = localStorage.getItem('myfestival_custom_colors_guest');
+      customColors = guestColors ? guestColors.split(',').map(c => c.trim()).filter(Boolean) : [];
+    }
+    
+    if (currentUser) {
+      const localTextColors = localStorage.getItem(`myfestival_custom_text_colors_${currentUser.id}`);
+      customTextColors = localTextColors ? localTextColors.split(',').map(c => c.trim()).filter(Boolean) : [];
+    } else {
+      const guestTextColors = localStorage.getItem('myfestival_custom_text_colors_guest');
+      customTextColors = guestTextColors ? guestTextColors.split(',').map(c => c.trim()).filter(Boolean) : [];
+    }
+    
+    renderPaperSheets();
+    renderTextPencils();
   }
-  renderCustomColors();
-}
 
 function selectColor(color) {
   // Update card background color
@@ -220,20 +236,20 @@ function selectColor(color) {
     cardArea.style.backgroundColor = color;
   }
 
-  // Update selected active class on pencils
-  const pencils = document.querySelectorAll('.pencil-item');
-  pencils.forEach(p => {
-    const pColor = p.getAttribute('data-color');
-    if (pColor && pColor.toLowerCase() === color.toLowerCase()) {
-      p.classList.add('active');
+  // Update selected active class on paper sheets
+  const sheets = document.querySelectorAll('#paper-sheets-case .paper-sheet-item');
+  sheets.forEach(s => {
+    const sColor = s.getAttribute('data-color');
+    if (sColor && sColor.toLowerCase() === color.toLowerCase()) {
+      s.classList.add('active');
     } else {
-      p.classList.remove('active');
+      s.classList.remove('active');
     }
   });
 }
 
-function renderPencils() {
-  const caseContainer = document.getElementById('pencil-holder-case');
+function renderPaperSheets() {
+  const caseContainer = document.getElementById('paper-sheets-case');
   if (!caseContainer) return;
 
   const presetColors = ['#fffefb', '#fde2e4', '#cce3f5', '#e2ece9', '#f0e6ef'];
@@ -242,11 +258,8 @@ function renderPencils() {
   // Render presets
   presetColors.forEach(color => {
     html += `
-      <div class="pencil-item group preset-pencil" data-color="${color}" title="สี ${color}">
-        <div class="pencil-tip">
-          <div class="pencil-lead" style="border-bottom-color: ${color};"></div>
-        </div>
-        <div class="pencil-body" style="background-color: ${color};"></div>
+      <div class="paper-sheet-item group preset-paper-sheet" data-color="${color}" title="สี ${color}">
+        <div class="paper-sheet-body" style="background-color: ${color};"></div>
       </div>
     `;
   });
@@ -254,27 +267,21 @@ function renderPencils() {
   // Render custom colors (max 5)
   customColors.forEach((color, index) => {
     html += `
-      <div class="pencil-item group custom-pencil" data-color="${color}" title="สีผสมเอง ${color}">
-        <div class="pencil-actions">
+      <div class="paper-sheet-item group custom-paper-sheet" data-color="${color}" title="สีผสมเอง ${color}">
+        <div class="paper-sheet-actions">
           <button type="button" class="pencil-action-btn edit" data-index="${index}" title="แก้ไขสี">✎</button>
           <button type="button" class="pencil-action-btn delete" data-index="${index}" title="ลบสี">×</button>
         </div>
-        <div class="pencil-tip">
-          <div class="pencil-lead" style="border-bottom-color: ${color};"></div>
-        </div>
-        <div class="pencil-body" style="background-color: ${color};"></div>
+        <div class="paper-sheet-body" style="background-color: ${color};"></div>
       </div>
     `;
   });
 
-  // Plus button pencil (if custom colors count < 5)
+  // Plus button paper sheet (if custom colors count < 5)
   if (customColors.length < 5) {
     html += `
-      <div class="pencil-item group pencil-plus" id="btn-open-color-picker" title="เพิ่มสีใหม่">
-        <div class="pencil-tip">
-          <div class="pencil-lead" style="border-bottom-color: #8c7a6b;"></div>
-        </div>
-        <div class="pencil-body flex items-center justify-center text-white font-extrabold text-lg bg-pencil-soft">
+      <div class="paper-sheet-item group paper-sheet-plus" id="btn-open-color-picker" title="เพิ่มสีใหม่">
+        <div class="paper-sheet-body">
           +
         </div>
       </div>
@@ -282,18 +289,18 @@ function renderPencils() {
   }
 
   caseContainer.innerHTML = html;
-  setupPencilEvents();
+  setupPaperSheetEvents();
 }
 
-function setupPencilEvents() {
-  const caseContainer = document.getElementById('pencil-holder-case');
+function setupPaperSheetEvents() {
+  const caseContainer = document.getElementById('paper-sheets-case');
   if (!caseContainer) return;
 
-  // Click handler for color pencils
-  caseContainer.querySelectorAll('.pencil-item:not(.pencil-plus)').forEach(pencil => {
-    pencil.addEventListener('click', (e) => {
-      if (e.target.closest('.pencil-actions')) return; // Ignore if clicking action buttons
-      const color = pencil.getAttribute('data-color');
+  // Click handler for paper sheets
+  caseContainer.querySelectorAll('.paper-sheet-item:not(.paper-sheet-plus)').forEach(sheet => {
+    sheet.addEventListener('click', (e) => {
+      if (e.target.closest('.paper-sheet-actions')) return; // Ignore if clicking action buttons
+      const color = sheet.getAttribute('data-color');
       if (color) selectColor(color);
     });
   });
@@ -301,6 +308,8 @@ function setupPencilEvents() {
   // Click handler for adding custom color
   const plusBtn = document.getElementById('btn-open-color-picker');
   plusBtn?.addEventListener('click', () => {
+    pickingColorTarget = 'paper';
+    updateModalPresetColors('paper');
     editingColorIndex = null;
     const modalTitle = document.getElementById('color-modal-title');
     const submitBtn = document.getElementById('btn-submit-color');
@@ -319,6 +328,8 @@ function setupPencilEvents() {
   caseContainer.querySelectorAll('.pencil-action-btn.edit').forEach(btn => {
     btn.addEventListener('click', (e) => {
       e.stopPropagation();
+      pickingColorTarget = 'paper';
+      updateModalPresetColors('paper');
       const index = parseInt(btn.getAttribute('data-index'));
       if (isNaN(index)) return;
 
@@ -372,7 +383,179 @@ async function saveCustomColorsToDB() {
   } else {
     localStorage.setItem('myfestival_custom_colors_guest', colorStr);
   }
-  renderPencils();
+  renderPaperSheets();
+}
+
+function selectTextColor(color) {
+  const cardText = document.getElementById('card-text');
+  const cardSignature = document.getElementById('card-signature');
+  const cardFestival = document.getElementById('card-festival-name');
+  
+  if (cardText) cardText.style.color = color;
+  if (cardSignature) cardSignature.style.color = color;
+  if (cardFestival) cardFestival.style.color = color;
+
+  const pencils = document.querySelectorAll('#text-pencil-holder-case .pencil-item');
+  pencils.forEach(p => {
+    const pColor = p.getAttribute('data-color');
+    if (pColor && pColor.toLowerCase() === color.toLowerCase()) {
+      p.classList.add('active');
+    } else {
+      p.classList.remove('active');
+    }
+  });
+}
+
+function renderTextPencils() {
+  const caseContainer = document.getElementById('text-pencil-holder-case');
+  if (!caseContainer) return;
+
+  const presetColors = ['#4a3c31', '#1d3557', '#386641', '#78290f', '#3d348b'];
+  let html = '';
+
+  presetColors.forEach(color => {
+    html += `
+      <div class="pencil-item group preset-pencil" data-color="${color}" title="สี ${color}">
+        <div class="pencil-tip">
+          <div class="pencil-lead" style="border-bottom-color: ${color};"></div>
+        </div>
+        <div class="pencil-body" style="background-color: ${color};"></div>
+      </div>
+    `;
+  });
+
+  customTextColors.forEach((color, index) => {
+    html += `
+      <div class="pencil-item group custom-pencil" data-color="${color}" title="สีผสมเอง ${color}">
+        <div class="pencil-actions">
+          <button type="button" class="pencil-action-btn edit" data-index="${index}" title="แก้ไขสี">✎</button>
+          <button type="button" class="pencil-action-btn delete" data-index="${index}" title="ลบสี">×</button>
+        </div>
+        <div class="pencil-tip">
+          <div class="pencil-lead" style="border-bottom-color: ${color};"></div>
+        </div>
+        <div class="pencil-body" style="background-color: ${color};"></div>
+      </div>
+    `;
+  });
+
+  if (customTextColors.length < 5) {
+    html += `
+      <div class="pencil-item group pencil-plus" id="btn-open-text-color-picker" title="เพิ่มสีตัวอักษรใหม่">
+        <div class="pencil-tip">
+          <div class="pencil-lead" style="border-bottom-color: #8c7a6b;"></div>
+        </div>
+        <div class="pencil-body flex items-center justify-center text-white font-extrabold text-lg bg-pencil-soft">
+          +
+        </div>
+      </div>
+    `;
+  }
+
+  caseContainer.innerHTML = html;
+  setupTextPencilEvents();
+  
+  const cardText = document.getElementById('card-text');
+  const currentColor = cardText ? window.getComputedStyle(cardText).color : '#4a3c31';
+  let hexColor = '#4a3c31';
+  if (currentColor.startsWith('rgb')) {
+    const rgb = currentColor.match(/\d+/g);
+    if (rgb && rgb.length >= 3) {
+      const r = parseInt(rgb[0]).toString(16).padStart(2, '0');
+      const g = parseInt(rgb[1]).toString(16).padStart(2, '0');
+      const b = parseInt(rgb[2]).toString(16).padStart(2, '0');
+      hexColor = `#${r}${g}${b}`;
+    }
+  } else {
+    hexColor = currentColor;
+  }
+  
+  const pencils = caseContainer.querySelectorAll('.pencil-item');
+  pencils.forEach(p => {
+    const pColor = p.getAttribute('data-color');
+    if (pColor && pColor.toLowerCase() === hexColor.toLowerCase()) {
+      p.classList.add('active');
+    } else {
+      p.classList.remove('active');
+    }
+  });
+}
+
+function setupTextPencilEvents() {
+  const caseContainer = document.getElementById('text-pencil-holder-case');
+  if (!caseContainer) return;
+
+  caseContainer.querySelectorAll('.pencil-item:not(.pencil-plus)').forEach(pencil => {
+    pencil.addEventListener('click', (e) => {
+      if (e.target.closest('.pencil-actions')) return;
+      const color = pencil.getAttribute('data-color');
+      if (color) selectTextColor(color);
+    });
+  });
+
+  const plusBtn = document.getElementById('btn-open-text-color-picker');
+  plusBtn?.addEventListener('click', () => {
+    pickingColorTarget = 'text';
+    updateModalPresetColors('text');
+    editingTextColorIndex = null;
+    const modalTitle = document.getElementById('color-modal-title');
+    const submitBtn = document.getElementById('btn-submit-color');
+
+    if (modalTitle) modalTitle.textContent = '🎨 ผสมสีตัวอักษรใหม่';
+    if (submitBtn) submitBtn.textContent = 'บันทึกสีนี้ 💾';
+
+    const defaultColor = '#4a3c31';
+    updateWheelColor(defaultColor, true);
+    drawWheelWithIndicator(defaultColor);
+
+    document.getElementById('add-color-modal')?.classList.remove('hidden');
+  });
+
+  caseContainer.querySelectorAll('.pencil-action-btn.edit').forEach(btn => {
+    btn.addEventListener('click', (e) => {
+      e.stopPropagation();
+      pickingColorTarget = 'text';
+      updateModalPresetColors('text');
+      const index = parseInt(btn.getAttribute('data-index'));
+      if (isNaN(index)) return;
+
+      editingTextColorIndex = index;
+      const color = customTextColors[index];
+
+      const modalTitle = document.getElementById('color-modal-title');
+      const submitBtn = document.getElementById('btn-submit-color');
+
+      if (modalTitle) modalTitle.textContent = '🎨 แก้ไขสีตัวอักษร';
+      if (submitBtn) submitBtn.textContent = 'บันทึกการแก้ไข 💾';
+
+      updateWheelColor(color, true);
+      drawWheelWithIndicator(color);
+
+      document.getElementById('add-color-modal')?.classList.remove('hidden');
+    });
+  });
+
+  caseContainer.querySelectorAll('.pencil-action-btn.delete').forEach(btn => {
+    btn.addEventListener('click', async (e) => {
+      e.stopPropagation();
+      const index = parseInt(btn.getAttribute('data-index'));
+      if (isNaN(index)) return;
+
+      customTextColors.splice(index, 1);
+      await saveCustomTextColorsToDB();
+    });
+  });
+}
+
+async function saveCustomTextColorsToDB() {
+  const colorStr = customTextColors.join(',');
+
+  if (currentUser) {
+    localStorage.setItem(`myfestival_custom_text_colors_${currentUser.id}`, colorStr);
+  } else {
+    localStorage.setItem('myfestival_custom_text_colors_guest', colorStr);
+  }
+  renderTextPencils();
 }
 
 function hslToHex(h, s, l) {
@@ -516,6 +699,28 @@ function updateWheelColor(hexColor, updateInput = true) {
   if (updateInput && hexInput) hexInput.value = hexColor.toUpperCase();
 }
 
+function updateModalPresetColors(target) {
+  const titleEl = document.getElementById('modal-preset-title');
+  const containerEl = document.getElementById('modal-preset-colors-container');
+  if (!containerEl) return;
+
+  let title = 'จานสีกระดาษยอดนิยม (Pastel Presets):';
+  let colors = ['#fffefb', '#fde2e4', '#cce3f5', '#e2ece9', '#f0e6ef', '#fefae0', '#faedcd', '#d8f3dc', '#ffe5ec', '#e8dbcd'];
+
+  if (target === 'text') {
+    title = 'จานสีตัวอักษรยอดนิยม (Dark Presets):';
+    colors = ['#4a3c31', '#1d3557', '#386641', '#78290f', '#3d348b', '#000000', '#03045e', '#1b4332', '#660708', '#005f73'];
+  }
+
+  if (titleEl) titleEl.textContent = title;
+
+  containerEl.innerHTML = colors.map(color => `
+    <button type="button"
+      class="modal-preset-color w-8 h-8 rounded-full border-2 border-pencil focus:scale-110 shadow-[1px_1px_0px_var(--color-pencil)] transition-all"
+      style="background-color: ${color};" data-hex="${color}"></button>
+  `).join('');
+}
+
 function drawWheelWithIndicator(hexColor) {
   const canvas = document.getElementById('color-wheel-canvas');
   if (!canvas) return;
@@ -600,15 +805,17 @@ function setupColorWheelEvents() {
     isDragging = false;
   });
 
-  // Modal Preset colors click inside modal
-  document.querySelectorAll('.modal-preset-color').forEach(btn => {
-    btn.addEventListener('click', () => {
+  // Modal Preset colors click inside modal using event delegation
+  const presetContainer = document.getElementById('modal-preset-colors-container');
+  presetContainer?.addEventListener('click', (e) => {
+    const btn = e.target.closest('.modal-preset-color');
+    if (btn) {
       const hex = btn.getAttribute('data-hex');
       if (hex) {
         updateWheelColor(hex, true);
         drawWheelWithIndicator(hex);
       }
-    });
+    }
   });
 
   // HEX Input change handler
@@ -643,26 +850,51 @@ async function handleAddCustomColor(e) {
 
   const cleanColor = color.toLowerCase();
 
-  if (editingColorIndex !== null) {
-    customColors[editingColorIndex] = cleanColor;
-    await saveCustomColorsToDB();
+  if (pickingColorTarget === 'paper') {
+    if (editingColorIndex !== null) {
+      customColors[editingColorIndex] = cleanColor;
+      await saveCustomColorsToDB();
 
-    selectColor(cleanColor);
-    showToast('แก้ไขสีกระดาษเรียบร้อย! ✨', 'success');
-    closeColorModal();
-    editingColorIndex = null;
-  } else {
-    if (customColors.length >= 5) {
-      showToast('บันทึกสีกำหนดเองได้สูงสุด 5 สีเท่านั้นครับ 🎨', 'warning');
-      return;
+      selectColor(cleanColor);
+      showToast('แก้ไขสีกระดาษเรียบร้อย! ✨', 'success');
+      closeColorModal();
+      editingColorIndex = null;
+    } else {
+      if (customColors.length >= 5) {
+        showToast('บันทึกสีกำหนดเองได้สูงสุด 5 สีเท่านั้นครับ 🎨', 'warning');
+        return;
+      }
+
+      customColors.push(cleanColor);
+      await saveCustomColorsToDB();
+
+      selectColor(cleanColor);
+      showToast('บันทึกสีกำหนดเองเรียบร้อย! ✨', 'success');
+      closeColorModal();
     }
+  } else {
+    // pickingColorTarget === 'text'
+    if (editingTextColorIndex !== null) {
+      customTextColors[editingTextColorIndex] = cleanColor;
+      await saveCustomTextColorsToDB();
 
-    customColors.push(cleanColor);
-    await saveCustomColorsToDB();
+      selectTextColor(cleanColor);
+      showToast('แก้ไขสีตัวอักษรเรียบร้อย! ✨', 'success');
+      closeColorModal();
+      editingTextColorIndex = null;
+    } else {
+      if (customTextColors.length >= 5) {
+        showToast('บันทึกสีกำหนดเองได้สูงสุด 5 สีเท่านั้นครับ 🎨', 'warning');
+        return;
+      }
 
-    selectColor(cleanColor);
-    showToast('บันทึกสีกำหนดเองเรียบร้อย! ✨', 'success');
-    closeColorModal();
+      customTextColors.push(cleanColor);
+      await saveCustomTextColorsToDB();
+
+      selectTextColor(cleanColor);
+      showToast('บันทึกสีกำหนดเองเรียบร้อย! ✨', 'success');
+      closeColorModal();
+    }
   }
 }
 
@@ -674,8 +906,9 @@ function setupCustomizerEvents() {
   const cardArea = document.getElementById('capture-card-area');
   const patternOverlay = document.getElementById('paper-pattern-overlay');
 
-  // Render pencils immediately so they are visible on load
-  renderPencils();
+  // Render paper sheets immediately so they are visible on load
+  renderPaperSheets();
+  renderTextPencils();
 
   // Load wheel and binding
   drawColorWheel();
