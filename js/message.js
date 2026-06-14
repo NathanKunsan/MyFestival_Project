@@ -215,7 +215,30 @@ async function drawRandomMessage(festivalId) {
         });
       }
     } else {
-      // 3. Guest User: Draw completely at random from filtered list
+      // 3. Guest User: Check quota before drawing
+      const MAX_GUEST_DRAWS = 3;
+      let guestDraws = parseInt(localStorage.getItem('guest_draw_count') || '0', 10);
+      
+      if (guestDraws >= MAX_GUEST_DRAWS) {
+        renderErrorState('โควต้าสุ่มสำหรับผู้เยี่ยมชมหมดแล้ว! สมัครสมาชิกฟรีเพื่อสุ่มแบบไม่จำกัดและเซฟการ์ดเก็บไว้ 🚀');
+        
+        // Append a register button to the error state
+        const container = document.getElementById('message-container');
+        if (container) {
+          const innerCard = container.querySelector('.sketch-card');
+          if (innerCard) {
+             const registerBtn = document.createElement('a');
+             registerBtn.href = '/register';
+             registerBtn.className = 'sketch-btn btn-orange text-xl py-3 w-full mt-4 text-center block';
+             registerBtn.innerHTML = 'สมัครสมาชิกเลย! 🌟';
+             innerCard.appendChild(registerBtn);
+          }
+        }
+        return;
+      }
+      
+      // Increment quota and draw
+      localStorage.setItem('guest_draw_count', (guestDraws + 1).toString());
       targetMessage = filteredMessages[Math.floor(Math.random() * filteredMessages.length)];
     }
 
@@ -231,11 +254,55 @@ async function drawRandomMessage(festivalId) {
   }
 }
 
+// Play a simple page flip sound using Web Audio API
+function playFlipSound() {
+  try {
+    const ctx = new (window.AudioContext || window.webkitAudioContext)();
+    if (ctx.state === 'suspended') ctx.resume();
+    
+    // Create a rustle/flip sound using a short noise burst with an envelope
+    const bufferSize = ctx.sampleRate * 0.15; // 150ms
+    const buffer = ctx.createBuffer(1, bufferSize, ctx.sampleRate);
+    const data = buffer.getChannelData(0);
+    for (let i = 0; i < bufferSize; i++) {
+      data[i] = Math.random() * 2 - 1; // White noise
+    }
+    
+    const noiseSource = ctx.createBufferSource();
+    noiseSource.buffer = buffer;
+    
+    // Add a lowpass filter to make it sound like paper, not static
+    const filter = ctx.createBiquadFilter();
+    filter.type = 'lowpass';
+    filter.frequency.setValueAtTime(1000, ctx.currentTime);
+    filter.frequency.exponentialRampToValueAtTime(100, ctx.currentTime + 0.15);
+    
+    // Volume envelope
+    const gainNode = ctx.createGain();
+    gainNode.gain.setValueAtTime(0.5, ctx.currentTime);
+    gainNode.gain.exponentialRampToValueAtTime(0.01, ctx.currentTime + 0.15);
+    
+    noiseSource.connect(filter);
+    filter.connect(gainNode);
+    gainNode.connect(ctx.destination);
+    
+    noiseSource.start();
+  } catch (e) {
+    console.log('Audio not supported or blocked', e);
+  }
+}
+
 // Render the drawn message on a sketchbook card
 async function renderMessageCard() {
   const container = document.getElementById('message-container');
   const controls = document.getElementById('message-controls');
   if (!container || !currentMessage) return;
+
+  // Play sound and trigger animation
+  playFlipSound();
+  container.classList.remove('card-flip');
+  void container.offsetWidth; // Trigger DOM reflow to restart animation
+  container.classList.add('card-flip');
 
   // Show controller buttons
   controls.classList.remove('hidden');
