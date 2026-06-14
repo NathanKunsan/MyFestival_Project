@@ -230,6 +230,21 @@ export const initLogin = () => {
     });
   }
 
+  // Google Login listener
+  const googleBtn = document.getElementById('btn-google-login');
+  googleBtn?.addEventListener('click', async () => {
+    const originalText = googleBtn.textContent;
+    googleBtn.disabled = true;
+    googleBtn.textContent = 'กำลังเปลี่ยนหน้าไปยัง Google... ⏳';
+    try {
+      await signInWithGoogle();
+    } catch (error) {
+      const { showToast } = await import('./router.js');
+      showToast('เข้าสู่ระบบด้วย Google ไม่สำเร็จ: ' + error.message, 'error');
+      googleBtn.disabled = false;
+      googleBtn.textContent = originalText;
+    }
+  });
 };
 
 export const initRegister = () => {
@@ -242,24 +257,47 @@ export const initRegister = () => {
       const email = document.getElementById('register-email').value.trim();
       const password = document.getElementById('register-password').value;
 
+      const { showToast } = await import('./router.js');
+
+      // Extra password check
+      if (password.length < 8) {
+        showToast('กรุณากรอกรหัสผ่านอย่างน้อย 8 ตัวอักษร', 'warning');
+        return;
+      }
+
       const submitBtn = form.querySelector('button[type="submit"]');
       const originalText = submitBtn.textContent;
       submitBtn.disabled = true;
       submitBtn.textContent = 'กำลังสร้างสมุดบัญชี... ✨';
 
       try {
-        const { showToast, navigate } = await import('./router.js');
+        const { navigate } = await import('./router.js');
         await signUp(email, password, name, 'member');
         showToast('สมัครสมาชิกสำเร็จ! โปรดตรวจสอบอีเมลของคุณเพื่อยืนยันบัญชี', 'success');
         setTimeout(() => {
           navigate('/login');
         }, 1500);
       } catch (error) {
-        const { showToast } = await import('./router.js');
         showToast(error.message || 'เกิดข้อผิดพลาดในการสมัครสมาชิก', 'error');
         submitBtn.disabled = false;
         submitBtn.textContent = originalText;
       }
     });
   }
+
+  // Google Register listener
+  const googleBtn = document.getElementById('btn-google-register');
+  googleBtn?.addEventListener('click', async () => {
+    const originalText = googleBtn.textContent;
+    googleBtn.disabled = true;
+    googleBtn.textContent = 'กำลังเปลี่ยนหน้าไปยัง Google... ⏳';
+    try {
+      await signInWithGoogle();
+    } catch (error) {
+      const { showToast } = await import('./router.js');
+      showToast('สมัครสมาชิกด้วย Google ไม่สำเร็จ: ' + error.message, 'error');
+      googleBtn.disabled = false;
+      googleBtn.textContent = originalText;
+    }
+  });
 };
