@@ -1,5 +1,5 @@
 // MyFestival - Contributor Dashboard Controller
-import { getSupabase } from './supabase.js';
+import { getSupabase, parseMessageTags, serializeMessageTags } from './supabase.js';
 import { getCurrentUser, getUserProfile } from './auth.js';
 import { showToast, navigate } from './router.js';
 
@@ -10,6 +10,23 @@ let userProfile = null;
 let festivalsList = [];
 let currentFilter = 'all'; // Filter messages status: 'all', 'approved', 'pending', 'rejected'
 
+
+const getMockData = (key, fallback) => {
+  const data = localStorage.getItem(`myfestival_mock_${key}`);
+  if (!data) {
+    localStorage.setItem(`myfestival_mock_${key}`, JSON.stringify(fallback));
+    return fallback;
+  }
+  try {
+    return JSON.parse(data);
+  } catch (e) {
+    return fallback;
+  }
+};
+
+const saveMockData = (key, data) => {
+  localStorage.setItem(`myfestival_mock_${key}`, JSON.stringify(data));
+};
 
 // Initialize Page
 export const init = async () => {
@@ -36,27 +53,35 @@ async function fetchFestivalsList() {
   
   const supabase = await getSupabase();
   try {
-    const { data, error } = await supabase
-      .from('festivals')
-      .select('id, name')
-      .order('start_date', { ascending: false });
-      
-    if (error) throw error;
-    
-    festivalsList = data || [];
-    
-    select.innerHTML = festivalsList.map(f => `
-      <option value="${f.id}">${f.name}</option>
-    `).join('');
-    
-    const editSelect = document.getElementById('edit-festival-select');
-    if (editSelect) {
-      editSelect.innerHTML = festivalsList.map(f => `
-        <option value="${f.id}">${f.name}</option>
-      `).join('');
+    if (supabase) {
+      const { data, error } = await supabase
+        .from('festivals')
+        .select('id, name')
+        .order('start_date', { ascending: false });
+        
+      if (error) throw error;
+      festivalsList = data || [];
+    } else {
+      throw new Error('Supabase client not configured');
     }
   } catch (error) {
-    console.error('Error fetching festivals list:', error);
+    console.warn('Error fetching festivals list, using mock fallback:', error);
+    const mockFestivals = getMockData('festivals', [
+      { id: '33333333-3333-3333-3333-333333333333', name: 'วันสงกรานต์' },
+      { id: '11111111-1111-1111-1111-111111111111', name: 'วันลอยกระทง' }
+    ]);
+    festivalsList = mockFestivals || [];
+  }
+  
+  select.innerHTML = festivalsList.map(f => `
+    <option value="${f.id}">${f.name}</option>
+  `).join('');
+  
+  const editSelect = document.getElementById('edit-festival-select');
+  if (editSelect) {
+    editSelect.innerHTML = festivalsList.map(f => `
+      <option value="${f.id}">${f.name}</option>
+    `).join('');
   }
 }
 
@@ -95,21 +120,26 @@ function setupFilterEvents() {
 async function loadDashboardData() {
   const supabase = await getSupabase();
   try {
-    const { data: messages, error } = await supabase
-      .from('messages')
-      .select('*, festivals(id, name), likes(id), saves(id), shares(id)')
-      .eq('contributor_id', currentUserId)
-      .order('created_at', { ascending: false });
-      
-    if (error) throw error;
-    
-    userMessages = messages || [];
-    renderStats();
-    renderMessageList();
+    if (supabase) {
+      const { data: messages, error } = await supabase
+        .from('messages')
+        .select('*, festivals(id, name), likes(id), saves(id), shares(id)')
+        .eq('contributor_id', currentUserId)
+        .order('created_at', { ascending: false });
+        
+      if (error) throw error;
+      userMessages = (messages || []).map(parseMessageTags);
+    } else {
+      throw new Error('Supabase client not configured');
+    }
   } catch (error) {
-    console.error('Error loading dashboard data:', error);
-    showToast('ดึงข้อมูลแดชบอร์ดไม่สำเร็จ: ' + error.message, 'error');
+    console.warn('Error loading dashboard data from Supabase, using mock fallback:', error);
+    const mockWishes = getMockData('wishes', []);
+    userMessages = mockWishes.filter(m => m.contributor_id === currentUserId);
+    userMessages.forEach(parseMessageTags);
   }
+  renderStats();
+  renderMessageList();
 }
 
 // Render Stats elements
@@ -201,9 +231,22 @@ function renderMessageList() {
             <span class="text-xs text-pencil-light font-bold">${startStr}</span>
           </div>
           
-          <p class="text-base font-bold leading-relaxed mb-3 italic">
+          <p class="text-base font-bold leading-relaxed mb-2 italic">
             "${msg.message_text}"
           </p>
+          ${(() => {
+            if (msg.tags) {
+              const tagList = msg.tags.split(',').map(t => t.trim()).filter(Boolean);
+              if (tagList.length > 0) {
+                return `
+                  <div class="flex flex-wrap gap-1.5 mt-1 mb-3">
+                    ${tagList.map(t => `<span class="sketch-badge btn-cream text-[10px] font-bold py-0.5 px-2">#${t}</span>`).join('')}
+                  </div>
+                `;
+              }
+            }
+            return '';
+          })()}
           <p class="text-xs font-bold text-pencil-light mb-1">✍️ ลายเซ็น: ${signatureText}</p>
           
           <div class="flex gap-4 text-xs font-bold text-pencil-light my-2">
@@ -263,7 +306,6 @@ function setupAddMessageForm() {
   form?.addEventListener('submit', async (e) => {
     e.preventDefault();
     const supabase = await getSupabase();
-    if (!supabase) return;
     
     const festivalId = document.getElementById('msg-festival-select').value;
     const text = document.getElementById('msg-text-input').value.trim();
@@ -278,50 +320,64 @@ function setupAddMessageForm() {
     
     try {
       const isApproved = userProfile?.role === 'admin';
+      let success = false;
       
       let insertData = {
         festival_id: festivalId,
         contributor_id: currentUserId,
-        message_text: text,
+        message_text: serializeMessageTags(text, tags),
         signature: sig || null,
         is_anonymous: anonymous,
-        status: isApproved ? 'approved' : 'pending',
-        tags: tags || null
+        status: isApproved ? 'approved' : 'pending'
       };
 
-      let { error } = await supabase
-        .from('messages')
-        .insert(insertData);
-        
-      if (error && error.message.includes('tags')) {
-        // Fallback insert without tags column
-        delete insertData.tags;
-        const { error: fallbackErr } = await supabase
+      if (supabase) {
+        let { error } = await supabase
           .from('messages')
           .insert(insertData);
-        error = fallbackErr;
-      }
+          
+        if (error) throw error;
+        success = true;
         
-      if (error) throw error;
-      
-      // Notify admin if custom tags are provided
-      if (tags) {
-        await supabase
-          .from('notifications')
-          .insert({
-            user_id: null, // null represents admins
-            title: '🏷️ ผู้ใช้เสนอแท็กใหม่',
-            content: `ผู้ใช้ ${sig || 'ผู้เขียน'} ได้เสนอแท็กใหม่: "${tags}" บนข้อความใหม่`,
-            type: 'system'
-          });
+        // Notify admin if custom tags are provided
+        if (tags) {
+          await supabase
+            .from('notifications')
+            .insert({
+              user_id: null, // null represents admins
+              title: '🏷️ ผู้ใช้เสนอแท็กใหม่',
+              content: `ผู้ใช้ ${sig || 'ผู้เขียน'} ได้เสนอแท็กใหม่: "${tags}" บนข้อความใหม่`,
+              type: 'system'
+            });
+        }
+        
+        // Log add activity
+        await supabase.from('activity_logs').insert({
+          user_id: currentUserId,
+          action: 'add_message',
+          details: { festival_id: festivalId }
+        });
       }
       
-      // Log add activity
-      await supabase.from('activity_logs').insert({
-        user_id: currentUserId,
-        action: 'add_message',
-        details: { festival_id: festivalId }
-      });
+      if (!success) {
+        // Mock Add Wish
+        const mockWishes = getMockData('wishes', []);
+        const newWish = {
+          id: `mock-wish-${Date.now()}`,
+          festival_id: festivalId,
+          contributor_id: currentUserId,
+          message_text: serializeMessageTags(text, tags),
+          signature: sig || null,
+          is_anonymous: anonymous,
+          status: isApproved ? 'approved' : 'pending',
+          created_at: new Date().toISOString(),
+          festivals: { name: festivalsList.find(f => f.id === festivalId)?.name || 'ทั่วไป' },
+          profiles: { full_name: userProfile?.full_name || 'ผู้เขียน', email: '' }
+        };
+        mockWishes.unshift(newWish);
+        saveMockData('wishes', mockWishes);
+        success = true;
+      }
       
       const successMsg = isApproved 
         ? 'ฝากคำอวยพรสำเร็จและอนุมัติเข้าระบบทันที! 🎉' 
@@ -424,20 +480,32 @@ function setupEditModalEvents() {
     }
     
     const supabase = await getSupabase();
-    if (!supabase) return;
-    
     const deleteBtn = document.getElementById('btn-delete-edit');
     const origText = deleteBtn.textContent;
     deleteBtn.disabled = true;
     deleteBtn.textContent = '🗑️ กำลังลบ...';
     
+    let success = false;
+    let errorMsg = '';
+    
     try {
-      const { error } = await supabase
-        .from('messages')
-        .delete()
-        .eq('id', editMessageObj.id);
-        
-      if (error) throw error;
+      if (supabase) {
+        const { error } = await supabase
+          .from('messages')
+          .delete()
+          .eq('id', editMessageObj.id);
+          
+        if (error) throw error;
+        success = true;
+      }
+      
+      if (!success) {
+        // Mock Delete Wish
+        const mockWishes = getMockData('wishes', []);
+        const filtered = mockWishes.filter(w => w.id !== editMessageObj.id);
+        saveMockData('wishes', filtered);
+        success = true;
+      }
       
       showToast('ลบคำอวยพรสำเร็จแล้ว!', 'success');
       document.getElementById('edit-message-modal').classList.add('hidden');
@@ -458,7 +526,6 @@ function setupEditModalEvents() {
     if (!editMessageObj) return;
     
     const supabase = await getSupabase();
-    if (!supabase) return;
     
     const festivalId = document.getElementById('edit-festival-select').value;
     const text = document.getElementById('edit-text-input').value.trim();
@@ -473,97 +540,128 @@ function setupEditModalEvents() {
     
     try {
       const isApproved = userProfile?.role === 'admin';
+      let success = false;
       
       if (editMessageObj.status === 'approved' && !isApproved) {
         // Edit Approved Message -> Create a new revision entry in message_revisions
-        let insertData = {
-          message_id: editMessageObj.id,
-          festival_id: festivalId,
-          message_text: text,
-          signature: sig || null,
-          is_anonymous: anonymous,
-          status: 'pending',
-          tags: tags || null
-        };
+        if (supabase) {
+          let insertData = {
+            message_id: editMessageObj.id,
+            festival_id: festivalId,
+            message_text: serializeMessageTags(text, tags),
+            signature: sig || null,
+            is_anonymous: anonymous,
+            status: 'pending'
+          };
 
-        let { error } = await supabase
-          .from('message_revisions')
-          .insert(insertData);
-          
-        if (error && error.message.includes('tags')) {
-          delete insertData.tags;
-          const { error: fallbackErr } = await supabase
+          let { error } = await supabase
             .from('message_revisions')
             .insert(insertData);
-          error = fallbackErr;
-        }
+            
+          if (error) throw error;
+          success = true;
           
-        if (error) throw error;
-        
-        // Notify admin if custom tags are provided
-        if (tags) {
-          await supabase
-            .from('notifications')
-            .insert({
-              user_id: null,
-              title: '🏷️ ผู้ใช้เสนอแท็กใหม่ (แก้ไขคำอวยพร)',
-              content: `ผู้ใช้ ${sig || 'ผู้เขียน'} ได้เสนอแท็กใหม่: "${tags}" บนข้อความที่แก้ไข`,
-              type: 'system'
-            });
+          // Notify admin if custom tags are provided
+          if (tags) {
+            await supabase
+              .from('notifications')
+              .insert({
+                user_id: null,
+                title: '🏷️ ผู้ใช้เสนอแท็กใหม่ (แก้ไขคำอวยพร)',
+                content: `ผู้ใช้ ${sig || 'ผู้เขียน'} ได้เสนอแท็กใหม่: "${tags}" บนข้อความที่แก้ไข`,
+                type: 'system'
+              });
+          }
+          
+          await supabase.from('activity_logs').insert({
+            user_id: currentUserId,
+            action: 'create_revision',
+            details: { message_id: editMessageObj.id }
+          });
         }
         
-        await supabase.from('activity_logs').insert({
-          user_id: currentUserId,
-          action: 'create_revision',
-          details: { message_id: editMessageObj.id }
-        });
+        if (!success) {
+          // Mock Create Revision
+          const mockRevisions = getMockData('revisions', []);
+          const newRevision = {
+            id: `mock-rev-${Date.now()}`,
+            message_id: editMessageObj.id,
+            festival_id: festivalId,
+            message_text: serializeMessageTags(text, tags),
+            signature: sig || null,
+            is_anonymous: anonymous,
+            status: 'pending',
+            created_at: new Date().toISOString(),
+            messages: {
+              id: editMessageObj.id,
+              message_text: editMessageObj.message_text,
+              signature: editMessageObj.signature,
+              is_anonymous: editMessageObj.is_anonymous,
+              festivals: { name: festivalsList.find(f => f.id === festivalId)?.name || 'ทั่วไป' },
+              profiles: { full_name: userProfile?.full_name || 'ผู้ร่วมเขียน', email: '' }
+            }
+          };
+          mockRevisions.unshift(newRevision);
+          saveMockData('revisions', mockRevisions);
+          success = true;
+        }
         
         showToast('ส่งข้อความแก้ไขเข้ารอการตรวจสอบใหม่สำเร็จแล้ว! ข้อความออริจินัลยังคงแสดงผลอยู่ตามปกติ', 'success');
       } else {
         // Edit Pending / Rejected Message OR Admin editing -> Update messages table directly
-        let updateData = {
-          festival_id: festivalId,
-          message_text: text,
-          signature: sig || null,
-          is_anonymous: anonymous,
-          status: isApproved ? 'approved' : 'pending',
-          rejection_reason: null, // Clear previous rejection reason
-          tags: tags || null
-        };
+        if (supabase) {
+          let updateData = {
+            festival_id: festivalId,
+            message_text: serializeMessageTags(text, tags),
+            signature: sig || null,
+            is_anonymous: anonymous,
+            status: isApproved ? 'approved' : 'pending',
+            rejection_reason: null // Clear previous rejection reason
+          };
 
-        let { error } = await supabase
-          .from('messages')
-          .update(updateData)
-          .eq('id', editMessageObj.id);
-          
-        if (error && error.message.includes('tags')) {
-          delete updateData.tags;
-          const { error: fallbackErr } = await supabase
+          let { error } = await supabase
             .from('messages')
             .update(updateData)
             .eq('id', editMessageObj.id);
-          error = fallbackErr;
-        }
+            
+          if (error) throw error;
+          success = true;
           
-        if (error) throw error;
-        
-        // Notify admin if custom tags are provided
-        if (tags) {
-          await supabase
-            .from('notifications')
-            .insert({
-              user_id: null,
-              title: '🏷️ ผู้ใช้เสนอแท็กใหม่ (อัปเดตตรง)',
-              content: `ผู้ใช้ ${sig || 'ผู้เขียน'} ได้เสนอแท็กใหม่: "${tags}" บนข้อความเดิม`,
-              type: 'system'
-            });
+          // Notify admin if custom tags are provided
+          if (tags) {
+            await supabase
+              .from('notifications')
+              .insert({
+                user_id: null,
+                title: '🏷️ ผู้ใช้เสนอแท็กใหม่ (อัปเดตตรง)',
+                content: `ผู้ใช้ ${sig || 'ผู้เขียน'} ได้เสนอแท็กใหม่: "${tags}" บนข้อความเดิม`,
+                type: 'system'
+              });
+          }
+          
+          await supabase.from('activity_logs').insert({
+            user_id: currentUserId,
+            action: isApproved ? 'admin_edit_message_directly' : 'update_message_directly',
+            details: { message_id: editMessageObj.id }
+          });
         }
         
-        await supabase.from('activity_logs').insert({
-          user_id: currentUserId,
-          action: isApproved ? 'admin_edit_message_directly' : 'update_message_directly',
-          details: { message_id: editMessageObj.id }
-        });
+        if (!success) {
+          // Mock Update message directly
+          const mockWishes = getMockData('wishes', []);
+          const index = mockWishes.findIndex(w => w.id === editMessageObj.id);
+          if (index !== -1) {
+            mockWishes[index].festival_id = festivalId;
+            mockWishes[index].message_text = serializeMessageTags(text, tags);
+            mockWishes[index].signature = sig || null;
+            mockWishes[index].is_anonymous = anonymous;
+            mockWishes[index].status = isApproved ? 'approved' : 'pending';
+            mockWishes[index].rejection_reason = null;
+            mockWishes[index].festivals = { name: festivalsList.find(f => f.id === festivalId)?.name || 'ทั่วไป' };
+            saveMockData('wishes', mockWishes);
+            success = true;
+          }
+        }
         
         const successMsg = isApproved 
           ? 'อัปเดตคำอวยพรเรียบร้อยและมีผลทันที! 🎉' 
