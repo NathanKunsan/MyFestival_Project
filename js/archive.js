@@ -132,10 +132,11 @@ function renderArchiveList(list) {
   
   grid.innerHTML = list.map(festival => {
     const approvedCount = festival.messages.filter(m => m.status === 'approved').length;
-    const startStr = formatDate(festival.start_date);
-    const endStr = formatDate(festival.end_date);
-    const startDate = new Date(festival.start_date);
-    const endDate = new Date(festival.end_date);
+    const { startDate, endDate, isAnnual } = getFestivalDates(festival);
+    const startStr = formatDate(startDate, isAnnual);
+    const endStr = formatDate(endDate, isAnnual);
+    const dateRangeStr = isAnnual ? `${startStr} - ${endStr} (ประจำปี)` : `${startStr} - ${endStr}`;
+    const cleanDesc = isAnnual ? festival.description.replace('[ประจำปี]', '').trim() : festival.description;
     
     let statusBadge = '';
     if (startDate <= now && endDate >= now) {
@@ -162,8 +163,8 @@ function renderArchiveList(list) {
               <h3 class="text-xl font-extrabold">${festival.name}</h3>
               ${statusBadge}
             </div>
-            <p class="text-xs text-pencil-light font-bold">🗓️ ${startStr} - ${endStr}</p>
-            <p class="text-sm line-clamp-2 text-pencil-light">${festival.description || ''}</p>
+            <p class="text-xs text-pencil-light font-bold">🗓️ ${dateRangeStr}</p>
+            <p class="festival-desc text-sm line-clamp-5 text-pencil-light whitespace-pre-line">${cleanDesc || ''}</p>
           </div>
           
           <div class="flex justify-between items-center pt-2">
@@ -185,6 +186,8 @@ function renderArchiveList(list) {
       </div>
     `;
   }).join('');
+  
+  adjustDescriptions();
 }
 
 // Attach Live Search input listeners
@@ -206,11 +209,83 @@ function setupSearchFilter() {
 }
 
 // Date Formatting Helper
-function formatDate(dateStr) {
+function formatDate(dateStr, isAnnual) {
   const date = new Date(dateStr);
+  if (isAnnual) {
+    return date.toLocaleDateString('th-TH', {
+      day: 'numeric',
+      month: 'short'
+    });
+  }
   return date.toLocaleDateString('th-TH', {
     day: 'numeric',
     month: 'short',
     year: 'numeric'
   });
+}
+
+function getFestivalDates(festival) {
+  const now = new Date();
+  let startDate = new Date(festival.start_date);
+  let endDate = new Date(festival.end_date);
+  const isAnnual = festival.description && festival.description.startsWith('[ประจำปี]');
+  
+  if (isAnnual) {
+    const currentYear = now.getFullYear();
+    startDate.setFullYear(currentYear);
+    endDate.setFullYear(currentYear);
+    
+    if (startDate > endDate) {
+      if (now >= startDate) {
+        endDate.setFullYear(currentYear + 1);
+      } else if (now <= endDate) {
+        startDate.setFullYear(currentYear - 1);
+      } else {
+        endDate.setFullYear(currentYear + 1);
+      }
+    } else {
+      if (now > endDate) {
+        startDate.setFullYear(currentYear + 1);
+        endDate.setFullYear(currentYear + 1);
+      }
+    }
+  }
+  
+  return { startDate, endDate, isAnnual };
+}
+
+function adjustDescriptions() {
+  setTimeout(() => {
+    const descEls = document.querySelectorAll('.festival-desc');
+    descEls.forEach(descEl => {
+      // Check if button is already added
+      if (descEl.nextElementSibling && descEl.nextElementSibling.classList.contains('btn-toggle-desc')) {
+        return;
+      }
+      
+      const isTruncated = descEl.scrollHeight > descEl.clientHeight;
+      if (isTruncated) {
+        const toggleBtn = document.createElement('button');
+        toggleBtn.type = 'button';
+        toggleBtn.className = 'btn-toggle-desc sketch-btn px-3.5 py-1.5 text-xs font-bold mt-2 shadow-[2px_2px_0px_0px_#4a3c31]';
+        toggleBtn.style.cssText = 'background-color: black !important; color: white !important; border-color: black !important;';
+        toggleBtn.textContent = 'ดูเพิ่มเติม';
+        
+        descEl.parentNode.insertBefore(toggleBtn, descEl.nextSibling);
+        
+        toggleBtn.addEventListener('click', (e) => {
+          e.preventDefault();
+          if (descEl.classList.contains('line-clamp-5')) {
+            descEl.classList.remove('line-clamp-5');
+            descEl.classList.add('line-clamp-none');
+            toggleBtn.textContent = 'ย่อ';
+          } else {
+            descEl.classList.remove('line-clamp-none');
+            descEl.classList.add('line-clamp-5');
+            toggleBtn.textContent = 'ดูเพิ่มเติม';
+          }
+        });
+      }
+    });
+  }, 100);
 }
