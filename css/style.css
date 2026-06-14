@@ -318,7 +318,7 @@ select.sketch-input {
 
 .flatpickr-current-month .numInputWrapper {
   width: 72px !important;
-  display: inline-block !important;
+  display: none !important;
   position: relative !important;
   height: 34px !important;
   box-sizing: border-box !important;
