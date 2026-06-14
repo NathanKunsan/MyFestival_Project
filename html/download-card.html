@@ -69,8 +69,8 @@
             <h2 class="text-xl font-extrabold mb-4 pb-2 border-b-2 border-pencil">⚙️ ปรับแต่งกระดาษ</h2>
             <div class="space-y-2.5 mb-6">
               <label class="font-bold text-sm block">1. เลือกสีกระดาษ :</label>
-              <div id="pencil-holder-case">
-                <!-- Preset Colored Pencils and Custom Colored Pencils will be rendered here dynamically -->
+              <div id="paper-sheets-case">
+                <!-- Preset Paper Sheets and Custom Paper Sheets will be rendered here dynamically -->
               </div>
             </div>
 
@@ -113,6 +113,14 @@
               </div>
             </div>
 
+            <!-- 3. Font Color Choice -->
+            <div class="space-y-2.5 mb-6">
+              <label class="font-bold text-sm block">3. เลือกสีตัวอักษร :</label>
+              <div id="text-pencil-holder-case">
+                <!-- Preset Colored Pencils and Custom Colored Pencils for font color will be rendered here dynamically -->
+              </div>
+            </div>
+
             <div class="sketch-divider"></div>
 
             <!-- Download Button -->
@@ -146,8 +154,8 @@
 
           <!-- Preset Palette for Fast Selection inside modal -->
           <div class="space-y-2">
-            <label class="font-bold text-sm block text-pencil">จานสียอดนิยม (Pastel Presets):</label>
-            <div class="grid grid-cols-5 gap-2">
+            <label id="modal-preset-title" class="font-bold text-sm block text-pencil">จานสียอดนิยม (Pastel Presets):</label>
+            <div id="modal-preset-colors-container" class="grid grid-cols-5 gap-2">
               <button type="button"
                 class="modal-preset-color w-8 h-8 rounded-full border-2 border-pencil focus:scale-110 shadow-[1px_1px_0px_var(--color-pencil)] transition-all"
                 style="background-color: #fffefb;" data-hex="#fffefb"></button>
@@ -163,7 +171,7 @@
               <button type="button"
                 class="modal-preset-color w-8 h-8 rounded-full border-2 border-pencil focus:scale-110 shadow-[1px_1px_0px_var(--color-pencil)] transition-all"
                 style="background-color: #f0e6ef;" data-hex="#f0e6ef"></button>
-
+ 
               <button type="button"
                 class="modal-preset-color w-8 h-8 rounded-full border-2 border-pencil focus:scale-110 shadow-[1px_1px_0px_var(--color-pencil)] transition-all"
                 style="background-color: #fefae0;" data-hex="#fefae0"></button>
