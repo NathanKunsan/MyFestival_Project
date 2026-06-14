@@ -211,16 +211,9 @@ function setupSearchFilter() {
 // Date Formatting Helper
 function formatDate(dateStr, isAnnual) {
   const date = new Date(dateStr);
-  if (isAnnual) {
-    return date.toLocaleDateString('th-TH', {
-      day: 'numeric',
-      month: 'short'
-    });
-  }
   return date.toLocaleDateString('th-TH', {
     day: 'numeric',
-    month: 'short',
-    year: 'numeric'
+    month: 'short'
   });
 }
 
