@@ -184,29 +184,45 @@ document.addEventListener('DOMContentLoaded', async () => {
   // Handle browser back/forward buttons & hash changes
   window.addEventListener('hashchange', () => {
     let path = window.location.hash.slice(1) || '/';
-    if (path.startsWith('access_token=') || path.startsWith('error=')) {
+    if (path.startsWith('access_token=')) {
       if (path.includes('type=recovery')) {
         path = '/reset-password?' + path;
       } else {
         path = '/';
       }
+    } else if (path.startsWith('error=')) {
+      const urlParams = new URLSearchParams(path);
+      const errorDesc = urlParams.get('error_description') || 'ลิงก์ไม่ถูกต้องหรือหมดอายุแล้ว';
+      setTimeout(async () => {
+        const { showToast } = await import('./router.js');
+        showToast(errorDesc.replace(/\+/g, ' '), 'error');
+      }, 500);
+      path = '/login';
     }
     routePage(path);
   });
 
   // Run router for initial load
   let initialPath = window.location.hash.slice(1) || '/';
-  if (initialPath.startsWith('access_token=') || initialPath.startsWith('error=')) {
+  if (initialPath.startsWith('access_token=')) {
     if (initialPath.includes('type=recovery')) {
       initialPath = '/reset-password?' + initialPath;
     } else {
       initialPath = '/';
     }
+  } else if (initialPath.startsWith('error=')) {
+    const urlParams = new URLSearchParams(initialPath);
+    const errorDesc = urlParams.get('error_description') || 'ลิงก์ไม่ถูกต้องหรือหมดอายุแล้ว';
+    setTimeout(async () => {
+      const { showToast } = await import('./router.js');
+      showToast(errorDesc.replace(/\+/g, ' '), 'error');
+    }, 500);
+    initialPath = '/login';
   }
-
+  
   // Initialize About System modal events
   initAboutModalEvents();
-
+  
   routePage(initialPath);
 });
 
