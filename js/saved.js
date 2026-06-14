@@ -1,5 +1,5 @@
 // MyFestival - Saved Messages Controller
-import { getSupabase } from './supabase.js';
+import { getSupabase, parseMessageTags } from './supabase.js';
 import { getCurrentUser } from './auth.js';
 import { showToast, navigate } from './router.js';
 
@@ -195,6 +195,7 @@ export const fetchUserSaved = async (userId) => {
     return (data || []).map(row => {
       const msg = row.messages;
       if (!msg) return null;
+      parseMessageTags(msg);
       return {
         id: msg.id,
         message_text: msg.message_text,
@@ -263,6 +264,7 @@ async function getMessageDetailsForLocalSave(supabase, messageId) {
       .single();
       
     if (!error && data) {
+      parseMessageTags(data);
       return {
         id: data.id,
         message_text: data.message_text,
