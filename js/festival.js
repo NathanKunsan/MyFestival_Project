@@ -158,8 +158,7 @@ function renderCategories() {
   let endedCount = 0;
   
   festivalsData.forEach(festival => {
-    const startDate = new Date(festival.start_date);
-    const endDate = new Date(festival.end_date);
+    const { startDate, endDate, isAnnual } = getFestivalDates(festival);
     const approvedCount = festival.messages.filter(m => m.status === 'approved').length;
     
     const cardHtml = createFestivalCard(festival, approvedCount);
@@ -187,12 +186,16 @@ function renderCategories() {
     endedList.innerHTML = `<p class="text-pencil-light font-bold italic col-span-full py-4 text-center">ไม่มีเทศกาลที่จบการบันทึกแล้ว... 💾</p>`;
   }
 
+  adjustDescriptions();
 }
 
 // Helper to create a single card
 function createFestivalCard(festival, approvedCount) {
-  const startStr = formatDate(festival.start_date);
-  const endStr = formatDate(festival.end_date);
+  const { startDate, endDate, isAnnual } = getFestivalDates(festival);
+  const startStr = formatDate(startDate, isAnnual);
+  const endStr = formatDate(endDate, isAnnual);
+  const dateRangeStr = isAnnual ? `${startStr} - ${endStr} (ประจำปี)` : `${startStr} - ${endStr}`;
+  const cleanDesc = isAnnual ? festival.description.replace('[ประจำปี]', '').trim() : festival.description;
   
   // Pick border/bg color based on ID to make the screen look colorful like colored pencils
   const colors = ['btn-yellow', 'btn-green', 'btn-blue', 'btn-pink', 'btn-purple', 'btn-orange'];
@@ -212,16 +215,16 @@ function createFestivalCard(festival, approvedCount) {
         </div>
         
         <h3 class="text-xl font-extrabold mb-1">${festival.name}</h3>
-        <p class="text-xs text-pencil-light font-bold mb-2">🗓️ ${startStr} - ${endStr}</p>
-        <p class="text-sm line-clamp-3">${festival.description || 'ไม่มีคำอธิบายเพิ่มเติม'}</p>
+        <p class="text-xs text-pencil-light font-bold mb-2">🗓️ ${dateRangeStr}</p>
+        <p class="festival-desc text-sm line-clamp-5 whitespace-pre-line">${cleanDesc || 'ไม่มีคำอธิบายเพิ่มเติม'}</p>
       </div>
       
       <div class="mt-4 pt-3 border-t-2 border-pencil-soft flex gap-2">
-        ${new Date(festival.start_date) > new Date()
+        ${startDate > new Date()
           ? `<button class="sketch-btn btn-cream text-sm flex-1 text-center py-1.5 justify-center opacity-60 btn-upcoming-lock">
                ⏳ ยังไม่เริ่มจัดงาน
              </button>`
-          : new Date(festival.end_date) < new Date()
+          : endDate < new Date()
             ? `<button class="sketch-btn btn-cream text-sm flex-1 text-center py-1.5 justify-center opacity-60 btn-ended-lock">
                  💾 สิ้นสุดเทศกาลแล้ว
                </button>`
@@ -267,13 +270,16 @@ function updateSliderContent() {
   
   setTimeout(() => {
     const festival = festivalsData[currentSliderIndex];
+    const { startDate, endDate, isAnnual } = getFestivalDates(festival);
     const approvedCount = festival.messages.filter(m => m.status === 'approved').length;
-    const startStr = formatDate(festival.start_date);
-    const endStr = formatDate(festival.end_date);
+    const startStr = formatDate(startDate, isAnnual);
+    const endStr = formatDate(endDate, isAnnual);
+    const dateRangeStr = isAnnual ? `${startStr} - ${endStr} (ประจำปี)` : `${startStr} - ${endStr}`;
+    const cleanDesc = isAnnual ? festival.description.replace('[ประจำปี]', '').trim() : festival.description;
     
     const now = new Date();
-    const isActive = new Date(festival.start_date) <= now && new Date(festival.end_date) >= now;
-    const isUpcoming = new Date(festival.start_date) > now;
+    const isActive = startDate <= now && endDate >= now;
+    const isUpcoming = startDate > now;
     
     let statusBadge = '';
     if (isActive) {
@@ -306,11 +312,11 @@ function updateSliderContent() {
         
         <h2 class="text-3xl font-extrabold">${festival.name}</h2>
         <p class="text-sm font-bold text-pencil-light">
-          🗓️ ${startStr} - ${endStr}
+          🗓️ ${dateRangeStr}
         </p>
         
-        <p class="text-base text-pencil-light">
-          ${festival.description || 'เชิญร่วมสุ่มเปิดรับการ์ดอวยพรหรือฝากคำอวยพรเพื่อส่งต่อความสุขให้เพื่อนพ้องพี่น้องชาวไทยได้เลย!'}
+        <p class="festival-desc text-base text-pencil-light line-clamp-5 whitespace-pre-line">
+          ${cleanDesc || 'เชิญร่วมสุ่มเปิดรับการ์ดอวยพรหรือฝากคำอวยพรเพื่อส่งต่อความสุขให้เพื่อนพ้องพี่น้องชาวไทยได้เลย!'}
         </p>
         
         <div class="pt-4 flex flex-wrap gap-2">
@@ -318,7 +324,7 @@ function updateSliderContent() {
             ? `<button class="sketch-btn btn-cream py-2.5 px-6 opacity-60 text-lg btn-upcoming-lock">
                  ⏳ ยังไม่เริ่ม
                </button>`
-            : new Date(festival.end_date) < now
+            : endDate < now
               ? `<button class="sketch-btn btn-cream py-2.5 px-6 opacity-60 text-lg btn-ended-lock">
                    💾 สิ้นสุดเทศกาลแล้ว
                  </button>`
@@ -340,6 +346,8 @@ function updateSliderContent() {
     void heroSlider.offsetWidth;
     heroSlider.classList.remove('slide-fade-out');
     heroSlider.classList.add('slide-fade-in');
+    
+    adjustDescriptions();
   }, 400); // 400ms transition delay
 }
 
@@ -414,13 +422,49 @@ function stopSliderAutoPlay() {
 }
 
 // Date Formatting Helper
-function formatDate(dateStr) {
+function formatDate(dateStr, isAnnual) {
   const date = new Date(dateStr);
+  if (isAnnual) {
+    return date.toLocaleDateString('th-TH', {
+      day: 'numeric',
+      month: 'short'
+    });
+  }
   return date.toLocaleDateString('th-TH', {
     day: 'numeric',
     month: 'short',
     year: 'numeric'
   });
+}
+
+export function getFestivalDates(festival) {
+  const now = new Date();
+  let startDate = new Date(festival.start_date);
+  let endDate = new Date(festival.end_date);
+  const isAnnual = festival.description && festival.description.startsWith('[ประจำปี]');
+  
+  if (isAnnual) {
+    const currentYear = now.getFullYear();
+    startDate.setFullYear(currentYear);
+    endDate.setFullYear(currentYear);
+    
+    if (startDate > endDate) {
+      if (now >= startDate) {
+        endDate.setFullYear(currentYear + 1);
+      } else if (now <= endDate) {
+        startDate.setFullYear(currentYear - 1);
+      } else {
+        endDate.setFullYear(currentYear + 1);
+      }
+    } else {
+      if (now > endDate) {
+        startDate.setFullYear(currentYear + 1);
+        endDate.setFullYear(currentYear + 1);
+      }
+    }
+  }
+  
+  return { startDate, endDate, isAnnual };
 }
 
 // Simple hash generator for unique indices
@@ -474,3 +518,39 @@ export const cleanup = () => {
   }
   isInitialLoad = true;
 };
+
+function adjustDescriptions() {
+  setTimeout(() => {
+    const descEls = document.querySelectorAll('.festival-desc');
+    descEls.forEach(descEl => {
+      // Check if button is already added
+      if (descEl.nextElementSibling && descEl.nextElementSibling.classList.contains('btn-toggle-desc')) {
+        return;
+      }
+      
+      const isTruncated = descEl.scrollHeight > descEl.clientHeight;
+      if (isTruncated) {
+        const toggleBtn = document.createElement('button');
+        toggleBtn.type = 'button';
+        toggleBtn.className = 'btn-toggle-desc sketch-btn px-3.5 py-1.5 text-xs font-bold mt-2 shadow-[2px_2px_0px_0px_#4a3c31]';
+        toggleBtn.style.cssText = 'background-color: black !important; color: white !important; border-color: black !important;';
+        toggleBtn.textContent = 'ดูเพิ่มเติม';
+        
+        descEl.parentNode.insertBefore(toggleBtn, descEl.nextSibling);
+        
+        toggleBtn.addEventListener('click', (e) => {
+          e.preventDefault();
+          if (descEl.classList.contains('line-clamp-5')) {
+            descEl.classList.remove('line-clamp-5');
+            descEl.classList.add('line-clamp-none');
+            toggleBtn.textContent = 'ย่อ';
+          } else {
+            descEl.classList.remove('line-clamp-none');
+            descEl.classList.add('line-clamp-5');
+            toggleBtn.textContent = 'ดูเพิ่มเติม';
+          }
+        });
+      }
+    });
+  }, 100);
+}
