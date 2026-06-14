@@ -230,21 +230,7 @@ export const initLogin = () => {
     });
   }
 
-  // Google Login listener
-  const googleBtn = document.getElementById('btn-google-login');
-  googleBtn?.addEventListener('click', async () => {
-    const originalText = googleBtn.textContent;
-    googleBtn.disabled = true;
-    googleBtn.textContent = 'กำลังเปลี่ยนหน้าไปยัง Google... ⏳';
-    try {
-      await signInWithGoogle();
-    } catch (error) {
-      const { showToast } = await import('./router.js');
-      showToast('เข้าสู่ระบบด้วย Google ไม่สำเร็จ: ' + error.message, 'error');
-      googleBtn.disabled = false;
-      googleBtn.textContent = originalText;
-    }
-  });
+
 };
 
 export const initRegister = () => {
@@ -285,19 +271,5 @@ export const initRegister = () => {
     });
   }
 
-  // Google Register listener
-  const googleBtn = document.getElementById('btn-google-register');
-  googleBtn?.addEventListener('click', async () => {
-    const originalText = googleBtn.textContent;
-    googleBtn.disabled = true;
-    googleBtn.textContent = 'กำลังเปลี่ยนหน้าไปยัง Google... ⏳';
-    try {
-      await signInWithGoogle();
-    } catch (error) {
-      const { showToast } = await import('./router.js');
-      showToast('สมัครสมาชิกด้วย Google ไม่สำเร็จ: ' + error.message, 'error');
-      googleBtn.disabled = false;
-      googleBtn.textContent = originalText;
-    }
-  });
+
 };
