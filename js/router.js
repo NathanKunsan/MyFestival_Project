@@ -183,42 +183,12 @@ document.addEventListener('DOMContentLoaded', async () => {
 
   // Handle browser back/forward buttons & hash changes
   window.addEventListener('hashchange', () => {
-    let path = window.location.hash.slice(1) || '/';
-    if (path.startsWith('access_token=')) {
-      if (path.includes('type=recovery')) {
-        path = '/reset-password?' + path;
-      } else {
-        path = '/';
-      }
-    } else if (path.startsWith('error=')) {
-      const urlParams = new URLSearchParams(path);
-      const errorDesc = urlParams.get('error_description') || 'ลิงก์ไม่ถูกต้องหรือหมดอายุแล้ว';
-      setTimeout(async () => {
-        const { showToast } = await import('./router.js');
-        showToast(errorDesc.replace(/\+/g, ' '), 'error');
-      }, 500);
-      path = '/login';
-    }
+    const path = window.location.hash.slice(1) || '/';
     routePage(path);
   });
 
   // Run router for initial load
-  let initialPath = window.location.hash.slice(1) || '/';
-  if (initialPath.startsWith('access_token=')) {
-    if (initialPath.includes('type=recovery')) {
-      initialPath = '/reset-password?' + initialPath;
-    } else {
-      initialPath = '/';
-    }
-  } else if (initialPath.startsWith('error=')) {
-    const urlParams = new URLSearchParams(initialPath);
-    const errorDesc = urlParams.get('error_description') || 'ลิงก์ไม่ถูกต้องหรือหมดอายุแล้ว';
-    setTimeout(async () => {
-      const { showToast } = await import('./router.js');
-      showToast(errorDesc.replace(/\+/g, ' '), 'error');
-    }, 500);
-    initialPath = '/login';
-  }
+  const initialPath = window.location.hash.slice(1) || '/';
   
   // Initialize About System modal events
   initAboutModalEvents();
@@ -378,12 +348,6 @@ function matchRoute(path) {
   }
   if (path === '/register') {
     return { view: '/html/register.html', controller: '/js/auth.js', initName: 'initRegister', params: {} };
-  }
-  if (path === '/forgot-password') {
-    return { view: '/html/forgot-password.html', controller: '/js/auth.js', initName: 'initForgotPassword', params: {} };
-  }
-  if (path === '/reset-password') {
-    return { view: '/html/reset-password.html', controller: '/js/auth.js', initName: 'initResetPassword', params: {} };
   }
   if (['/archive', '/saved', '/profile', '/admin', '/contributor', '/suggest', '/download-card'].includes(path)) {
     return { view: `/html${path}.html`, controller: `/js${path}.js`, params: {} };
@@ -553,8 +517,8 @@ function checkAccessGuards(path) {
   if (path === '/suggest' && role === 'guest') {
     return '/login'; // Must login to suggest festival
   }
-  if (['/login', '/register', '/forgot-password', '/reset-password'].includes(path) && role !== 'guest') {
-    return '/'; // Redirect logged in user from auth pages
+  if (['/login', '/register'].includes(path) && role !== 'guest') {
+    return '/'; // Redirect logged in user from login/register
   }
   return null;
 }
