@@ -97,6 +97,7 @@ const getMockFestivals = () => {
 
 // Fetch and filter ended festivals from database
 async function fetchArchivedFestivals(supabase) {
+  renderArchiveSkeletons();
   try {
     const { data, error } = await supabase
       .from('festivals')
@@ -112,6 +113,34 @@ async function fetchArchivedFestivals(supabase) {
     archivedFestivals = getMockFestivals();
     renderArchiveList(archivedFestivals);
   }
+}
+
+// Render Skeleton Loading UI
+function renderArchiveSkeletons() {
+  const grid = document.getElementById('archive-grid');
+  if (!grid) return;
+  
+  const skeletonHtml = `
+    <div class="sketch-card sketch-card-alt p-4 bg-white flex flex-col md:flex-row gap-4 items-center animate-pulse">
+      <div class="w-full md:w-1/3 aspect-[4/3] rounded border-2 border-pencil bg-pencil-soft/30"></div>
+      <div class="w-full md:w-2/3 flex flex-col justify-between h-full space-y-3">
+        <div class="space-y-2 w-full">
+          <div class="h-7 bg-pencil-soft/40 rounded w-3/4"></div>
+          <div class="h-4 bg-pencil-soft/30 rounded w-1/3 mb-4 mt-2"></div>
+          <div class="space-y-2 mt-4 w-full">
+             <div class="h-3 bg-pencil-soft/30 rounded w-full"></div>
+             <div class="h-3 bg-pencil-soft/30 rounded w-5/6"></div>
+             <div class="h-3 bg-pencil-soft/30 rounded w-4/6"></div>
+          </div>
+        </div>
+        <div class="flex justify-between items-center pt-2 w-full mt-4">
+          <div class="h-4 bg-pencil-soft/40 rounded w-1/4"></div>
+          <div class="h-8 bg-pencil-soft/40 rounded w-1/3"></div>
+        </div>
+      </div>
+    </div>
+  `;
+  grid.innerHTML = skeletonHtml + skeletonHtml + skeletonHtml;
 }
 
 // Render the filtered festival list
