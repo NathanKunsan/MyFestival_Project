@@ -742,57 +742,96 @@ function downloadCardAsPNG() {
   const cardArea = document.getElementById('capture-card-area');
   if (!cardArea) return;
   
-  const originalShadow = cardArea.style.boxShadow;
-  const originalTransform = cardArea.style.transform;
-  
-  cardArea.style.boxShadow = 'none';
-  cardArea.style.transform = 'none';
-  
   showToast('กำลังประมวลผลรูปภาพคำอวยพร... 🎨', 'info');
   
+  // Clone the card to a temporary padded transparent container to prevent clipping of shadows/washi tape/etc.
+  const cloneContainer = document.createElement('div');
+  cloneContainer.style.position = 'fixed';
+  cloneContainer.style.top = '-9999px';
+  cloneContainer.style.left = '-9999px';
+  cloneContainer.style.background = 'transparent';
+  cloneContainer.style.padding = '32px';
+  cloneContainer.style.boxSizing = 'border-box';
+  cloneContainer.style.display = 'flex';
+  cloneContainer.style.justifyContent = 'center';
+  cloneContainer.style.alignItems = 'center';
+  cloneContainer.style.zIndex = '-9999';
+  
+  const cardClone = cardArea.cloneNode(true);
+  
+  // Keep same width and height
+  const rect = cardArea.getBoundingClientRect();
+  cardClone.style.width = `${rect.width}px`;
+  cardClone.style.minHeight = `${rect.height}px`;
+  cardClone.style.transform = 'none';
+  cardClone.style.margin = '0';
+  
+  // Ensure background color is preserved in the clone
+  cardClone.style.backgroundColor = window.getComputedStyle(cardArea).backgroundColor;
+  
+  cloneContainer.appendChild(cardClone);
+  document.body.appendChild(cloneContainer);
+  
   setTimeout(() => {
-    window.html2canvas(cardArea, {
+    window.html2canvas(cloneContainer, {
       scale: 3,
       backgroundColor: null,
       useCORS: true,
       allowTaint: true
     }).then(canvas => {
-      cardArea.style.boxShadow = originalShadow;
-      cardArea.style.transform = originalTransform;
+      // Clean up the clone container
+      if (document.body.contains(cloneContainer)) {
+        document.body.removeChild(cloneContainer);
+      }
       
       try {
         const imgDataUrl = canvas.toDataURL('image/png');
         const isMobile = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
         
         if (isMobile) {
-          const mobileModal = document.getElementById('mobile-download-modal');
-          const mobileImg = document.getElementById('mobile-download-img');
-          if (mobileModal && mobileImg) {
-            mobileImg.src = imgDataUrl;
-            mobileModal.classList.remove('hidden');
-            showToast('สร้างรูปภาพสำเร็จ! โปรดแตะค้างที่รูปเพื่อบันทึก 📱', 'success');
-            return;
-          }
+          const proceed = confirm('คุณต้องการดาวน์โหลดรูปภาพการ์ดอวยพรนี้ใช่หรือไม่?');
+          if (!proceed) return;
         }
 
-        const link = document.createElement('a');
         const rawFestivalName = document.getElementById('card-festival-name')?.textContent || 'Festival';
         const cleanFestivalName = rawFestivalName.replace('🏷️ ', '').trim();
+        
+        // Convert to Blob URL for more reliable downloading on mobile devices (including Safari)
+        const blob = dataURLtoBlob(imgDataUrl);
+        const blobUrl = URL.createObjectURL(blob);
+        
+        const link = document.createElement('a');
         link.download = `MyFestival-${cleanFestivalName}.png`;
-        link.href = imgDataUrl;
+        link.href = blobUrl;
+        document.body.appendChild(link);
         link.click();
+        document.body.removeChild(link);
+        
+        // Revoke URL to release memory
+        setTimeout(() => URL.revokeObjectURL(blobUrl), 100);
         showToast('ดาวน์โหลดรูปภาพการ์ดอวยพรสำเร็จแล้ว! ✨', 'success');
       } catch (err) {
         console.error('Error generating data URL:', err);
         showToast('ไม่สามารถเซฟรูปภาพได้: ' + err.message, 'error');
       }
     }).catch(err => {
-      cardArea.style.boxShadow = originalShadow;
-      cardArea.style.transform = originalTransform;
+      if (document.body.contains(cloneContainer)) {
+        document.body.removeChild(cloneContainer);
+      }
       console.error('html2canvas error:', err);
       showToast('การสร้างการ์ดผิดพลาด: ' + err.message, 'error');
     });
   }, 100);
+}
+
+// Utility to convert DataURL to Blob
+function dataURLtoBlob(dataurl) {
+  var arr = dataurl.split(','), mime = arr[0].match(/:(.*?);/)[1],
+      bstr = atob(arr[1]), n = bstr.length, u8arr = new Uint8Array(n);
+  while(n--){
+      u8arr[n] = bstr.charCodeAt(n);
+  }
+  return new Blob([u8arr], {type:mime});
 }
 
 export const cleanup = () => {
