@@ -1,5 +1,5 @@
 // MyFestival - Card Downloader Controller
-import { getSupabase } from './supabase.js';
+import { getSupabase, parseMessageTags } from './supabase.js';
 import { navigate, showToast } from './router.js';
 import { getCurrentUser } from './auth.js';
 
@@ -39,6 +39,10 @@ export const init = async () => {
   }
   
   currentWishId = wishId;
+  
+  // Try loading guest cached colors synchronously so they render immediately
+  const guestColors = localStorage.getItem('myfestival_custom_colors_guest');
+  customColors = guestColors ? guestColors.split(',').map(c => c.trim()).filter(Boolean) : [];
   
   // Set up interactive customizer events immediately so UI is responsive
   setupCustomizerEvents();
@@ -123,6 +127,8 @@ function renderWishData(data) {
   
   currentFestivalId = data.festival_id || data.festivals?.id || null;
   
+  parseMessageTags(data);
+  
   if (cardText) cardText.textContent = data.message_text;
   if (cardFestival) {
     cardFestival.textContent = `🏷️ ${data.festivals?.name || data.festival_name || 'เทศกาล'}`;
@@ -150,6 +156,8 @@ async function fetchAndRenderWish(supabase, wishId) {
       .single();
       
     if (error) throw error;
+    
+    parseMessageTags(data);
     
     currentFestivalId = data.festivals?.id || null;
     
@@ -212,63 +220,103 @@ function selectColor(color) {
     cardArea.style.backgroundColor = color;
   }
 
-  // Update brush tip paint color
-  const brushTip = document.getElementById('brush-tip-paint');
-  if (brushTip) {
-    brushTip.style.fill = color;
-  }
-
-  // Update center preview bubble color
-  const centerPreviewInner = document.getElementById('palette-center-preview-inner');
-  if (centerPreviewInner) {
-    centerPreviewInner.style.backgroundColor = color;
-  }
+  // Update selected active class on pencils
+  const pencils = document.querySelectorAll('.pencil-item');
+  pencils.forEach(p => {
+    const pColor = p.getAttribute('data-color');
+    if (pColor && pColor.toLowerCase() === color.toLowerCase()) {
+      p.classList.add('active');
+    } else {
+      p.classList.remove('active');
+    }
+  });
 }
 
-function renderCustomColors() {
-  const list = document.getElementById('user-colors-list');
-  if (!list) return;
+function renderPencils() {
+  const caseContainer = document.getElementById('pencil-holder-case');
+  if (!caseContainer) return;
 
-  list.innerHTML = customColors.map((color, index) => {
-    const slot = customColorSlots[index] || { left: '0px', top: '0px' };
-    return `
-      <div class="absolute group" style="left: ${slot.left}; top: ${slot.top}; transform: translate(-50%, -50%);">
-        <button type="button" class="color-swatch custom-swatch w-8 h-8 rounded-full border-2 border-pencil focus:scale-110 shadow-[1.5px_1.5px_0px_var(--color-pencil)] active:translate-x-[0.5px] active:translate-y-[0.5px] active:shadow-none transition-all" 
-                style="background-color: ${color};" data-color="${color}"></button>
-        <button type="button" class="btn-edit-color absolute -top-1 -left-1 bg-wood-yellow border border-pencil text-[9px] font-black w-4 h-4 rounded-full flex items-center justify-center shadow-[1px_1px_0px_0px_#4a3c31] hover:scale-110 active:scale-95 transition-all" data-index="${index}" title="แก้ไขสี">✎</button>
-        <button type="button" class="btn-delete-color absolute -top-1 -right-1 bg-wood-red border border-pencil text-[9px] font-black w-4 h-4 rounded-full flex items-center justify-center shadow-[1px_1px_0px_0px_#4a3c31] hover:scale-110 active:scale-95 transition-all" data-index="${index}" title="ลบสี">×</button>
+  const presetColors = ['#fffefb', '#fde2e4', '#cce3f5', '#e2ece9', '#f0e6ef'];
+  let html = '';
+
+  // Render presets
+  presetColors.forEach(color => {
+    html += `
+      <div class="pencil-item group preset-pencil" data-color="${color}" title="สี ${color}">
+        <div class="pencil-tip">
+          <div class="pencil-lead" style="border-bottom-color: ${color};"></div>
+        </div>
+        <div class="pencil-body" style="background-color: ${color};"></div>
       </div>
     `;
-  }).join('');
+  });
 
-  // Position and display plus button dynamically
-  const plusBtn = document.getElementById('btn-open-color-picker');
-  if (plusBtn) {
-    if (customColors.length >= 5) {
-      plusBtn.classList.add('hidden');
-    } else {
-      plusBtn.classList.remove('hidden');
-      const slot = getPlusButtonPosition();
-      plusBtn.style.left = slot.left;
-      plusBtn.style.top = slot.top;
-      plusBtn.style.transform = 'translate(-50%, -50%)';
-    }
+  // Render custom colors (max 5)
+  customColors.forEach((color, index) => {
+    html += `
+      <div class="pencil-item group custom-pencil" data-color="${color}" title="สีผสมเอง ${color}">
+        <div class="pencil-actions">
+          <button type="button" class="pencil-action-btn edit" data-index="${index}" title="แก้ไขสี">✎</button>
+          <button type="button" class="pencil-action-btn delete" data-index="${index}" title="ลบสี">×</button>
+        </div>
+        <div class="pencil-tip">
+          <div class="pencil-lead" style="border-bottom-color: ${color};"></div>
+        </div>
+        <div class="pencil-body" style="background-color: ${color};"></div>
+      </div>
+    `;
+  });
+
+  // Plus button pencil (if custom colors count < 5)
+  if (customColors.length < 5) {
+    html += `
+      <div class="pencil-item group pencil-plus" id="btn-open-color-picker" title="เพิ่มสีใหม่">
+        <div class="pencil-tip">
+          <div class="pencil-lead" style="border-bottom-color: #8c7a6b;"></div>
+        </div>
+        <div class="pencil-body flex items-center justify-center text-white font-extrabold text-lg bg-pencil-soft">
+          +
+        </div>
+      </div>
+    `;
   }
 
-  // Setup click triggers on all color swatches (preset & custom)
-  const swatches = document.querySelectorAll('.color-swatch');
-  
-  document.querySelectorAll('.custom-swatch').forEach(swatch => {
-    swatch.addEventListener('click', () => {
-      swatches.forEach(s => s.classList.remove('scale-110', 'ring-4', 'ring-pencil/30'));
-      swatch.classList.add('scale-110', 'ring-4', 'ring-pencil/30');
-      const color = swatch.getAttribute('data-color');
-      selectColor(color);
+  caseContainer.innerHTML = html;
+  setupPencilEvents();
+}
+
+function setupPencilEvents() {
+  const caseContainer = document.getElementById('pencil-holder-case');
+  if (!caseContainer) return;
+
+  // Click handler for color pencils
+  caseContainer.querySelectorAll('.pencil-item:not(.pencil-plus)').forEach(pencil => {
+    pencil.addEventListener('click', (e) => {
+      if (e.target.closest('.pencil-actions')) return; // Ignore if clicking action buttons
+      const color = pencil.getAttribute('data-color');
+      if (color) selectColor(color);
     });
   });
 
-  // Attach edit triggers
-  list.querySelectorAll('.btn-edit-color').forEach(btn => {
+  // Click handler for adding custom color
+  const plusBtn = document.getElementById('btn-open-color-picker');
+  plusBtn?.addEventListener('click', () => {
+    editingColorIndex = null;
+    const modalTitle = document.getElementById('color-modal-title');
+    const submitBtn = document.getElementById('btn-submit-color');
+
+    if (modalTitle) modalTitle.textContent = '🎨 ผสมสีกระดาษใหม่';
+    if (submitBtn) submitBtn.textContent = 'บันทึกสีนี้ 💾';
+
+    const defaultColor = '#fffefb';
+    updateWheelColor(defaultColor, true);
+    drawWheelWithIndicator(defaultColor);
+
+    document.getElementById('add-color-modal')?.classList.remove('hidden');
+  });
+
+  // Edit action
+  caseContainer.querySelectorAll('.pencil-action-btn.edit').forEach(btn => {
     btn.addEventListener('click', (e) => {
       e.stopPropagation();
       const index = parseInt(btn.getAttribute('data-index'));
@@ -277,23 +325,21 @@ function renderCustomColors() {
       editingColorIndex = index;
       const color = customColors[index];
 
-      // Populate color modal fields
       const modalTitle = document.getElementById('color-modal-title');
       const submitBtn = document.getElementById('btn-submit-color');
 
       if (modalTitle) modalTitle.textContent = '🎨 แก้ไขสีกระดาษ';
       if (submitBtn) submitBtn.textContent = 'บันทึกการแก้ไข 💾';
 
-      const hsl = hexToHsl(color);
-      updateHslUI(hsl.h, hsl.s, hsl.l);
+      updateWheelColor(color, true);
+      drawWheelWithIndicator(color);
 
-      // Open modal
       document.getElementById('add-color-modal')?.classList.remove('hidden');
     });
   });
 
-  // Attach delete triggers
-  list.querySelectorAll('.btn-delete-color').forEach(btn => {
+  // Delete action
+  caseContainer.querySelectorAll('.pencil-action-btn.delete').forEach(btn => {
     btn.addEventListener('click', async (e) => {
       e.stopPropagation();
       const index = parseInt(btn.getAttribute('data-index'));
@@ -309,7 +355,6 @@ async function saveCustomColorsToDB() {
   const colorStr = customColors.join(',');
 
   if (currentUser) {
-    // Sync to Supabase in the background (no await!)
     getSupabase().then(supabase => {
       if (supabase) {
         supabase
@@ -327,7 +372,7 @@ async function saveCustomColorsToDB() {
   } else {
     localStorage.setItem('myfestival_custom_colors_guest', colorStr);
   }
-  renderCustomColors();
+  renderPencils();
 }
 
 function hslToHex(h, s, l) {
@@ -346,14 +391,14 @@ function hexToHsl(hex) {
   hex = hex.replace(shorthandRegex, (m, r, g, b) => r + r + g + g + b + b);
   const result = /^#?([a-f\d]{2})([a-f\d]{2})([a-f\d]{2})$/i.exec(hex);
   if (!result) return { h: 0, s: 0, l: 90 };
-  
+
   let r = parseInt(result[1], 16) / 255;
   let g = parseInt(result[2], 16) / 255;
   let b = parseInt(result[3], 16) / 255;
-  
+
   const max = Math.max(r, g, b), min = Math.min(r, g, b);
   let h, s, l = (max + min) / 2;
-  
+
   if (max === min) {
     h = s = 0;
   } else {
@@ -366,7 +411,7 @@ function hexToHsl(hex) {
     }
     h /= 6;
   }
-  
+
   return {
     h: Math.round(h * 360),
     s: Math.round(s * 100),
@@ -374,55 +419,211 @@ function hexToHsl(hex) {
   };
 }
 
-function updateHslUI(h, s, l) {
-  const hueSlider = document.getElementById('hsl-hue');
-  const satSlider = document.getElementById('hsl-saturation');
-  const lightSlider = document.getElementById('hsl-lightness');
-  
-  const valHue = document.getElementById('val-hue');
-  const valSat = document.getElementById('val-saturation');
-  const valLight = document.getElementById('val-lightness');
-  
-  const hslPreview = document.getElementById('hsl-color-preview');
-  const hexInput = document.getElementById('user-color-hex');
-  
-  if (hueSlider) hueSlider.value = h;
-  if (satSlider) satSlider.value = s;
-  if (lightSlider) lightSlider.value = l;
-  
-  if (valHue) valHue.textContent = `${h}°`;
-  if (valSat) valSat.textContent = `${s}%`;
-  if (valLight) valLight.textContent = `${l}%`;
-  
-  const hexColor = hslToHex(h, s, l);
-  if (hexInput) hexInput.value = hexColor.toUpperCase();
-  if (hslPreview) hslPreview.style.backgroundColor = hexColor;
+function hslToRgb(h, s, l) {
+  s /= 100;
+  l /= 100;
+  const k = n => (n + h / 30) % 12;
+  const a = s * Math.min(l, 1 - l);
+  const f = n => l - a * Math.max(-1, Math.min(k(n) - 3, 9 - k(n), 1));
+  return {
+    r: Math.round(255 * f(0)),
+    g: Math.round(255 * f(8)),
+    b: Math.round(255 * f(4))
+  };
 }
 
-function setupHslListeners() {
-  const hueSlider = document.getElementById('hsl-hue');
-  const satSlider = document.getElementById('hsl-saturation');
-  const lightSlider = document.getElementById('hsl-lightness');
-  
-  const handler = () => {
-    const h = parseInt(hueSlider?.value || 0);
-    const s = parseInt(satSlider?.value || 100);
-    const l = parseInt(lightSlider?.value || 90);
-    updateHslUI(h, s, l);
-  };
-  
-  hueSlider?.addEventListener('input', handler);
-  satSlider?.addEventListener('input', handler);
-  lightSlider?.addEventListener('input', handler);
+function drawColorWheel() {
+  const canvas = document.getElementById('color-wheel-canvas');
+  if (!canvas) return;
 
+  const ctx = canvas.getContext('2d');
+  const width = canvas.width;
+  const height = canvas.height;
+  const cx = width / 2;
+  const cy = height / 2;
+  const radius = cx;
+
+  const imgData = ctx.createImageData(width, height);
+  const data = imgData.data;
+
+  for (let y = 0; y < height; y++) {
+    for (let x = 0; x < width; x++) {
+      const dx = x - cx;
+      const dy = y - cy;
+      const dist = Math.sqrt(dx * dx + dy * dy);
+
+      if (dist <= radius) {
+        let angle = Math.atan2(dy, dx) * 180 / Math.PI;
+        if (angle < 0) angle += 360;
+
+        const sat = dist / radius;
+        // Keep it pastel but visible (70% lightness at edges fading to 98% white at center)
+        const lightness = 0.70 + (1 - sat) * 0.28;
+
+        const rgb = hslToRgb(angle, sat * 100, lightness * 100);
+
+        const idx = (y * width + x) * 4;
+        data[idx] = rgb.r;
+        data[idx + 1] = rgb.g;
+        data[idx + 2] = rgb.b;
+        data[idx + 3] = 255;
+      } else {
+        const idx = (y * width + x) * 4;
+        data[idx + 3] = 0;
+      }
+    }
+  }
+  ctx.putImageData(imgData, 0, 0);
+}
+
+function getColorAtCoords(clientX, clientY) {
+  const canvas = document.getElementById('color-wheel-canvas');
+  if (!canvas) return null;
+
+  const rect = canvas.getBoundingClientRect();
+  const clickX = clientX - rect.left;
+  const clickY = clientY - rect.top;
+
+  const canvasX = clickX * (canvas.width / rect.width);
+  const canvasY = clickY * (canvas.height / rect.height);
+
+  const cx = canvas.width / 2;
+  const cy = canvas.height / 2;
+  const radius = cx;
+
+  const dx = canvasX - cx;
+  const dy = canvasY - cy;
+  const dist = Math.sqrt(dx * dx + dy * dy);
+
+  const clampedDist = Math.min(dist, radius);
+
+  let angle = Math.atan2(dy, dx) * 180 / Math.PI;
+  if (angle < 0) angle += 360;
+
+  const sat = clampedDist / radius;
+  const lightness = 0.70 + (1 - sat) * 0.28;
+
+  return hslToHex(angle, sat * 100, lightness * 100);
+}
+
+function updateWheelColor(hexColor, updateInput = true) {
+  const preview = document.getElementById('hsl-color-preview');
+  const hexInput = document.getElementById('user-color-hex');
+
+  if (!hexColor.startsWith('#')) hexColor = '#' + hexColor;
+
+  if (preview) preview.style.backgroundColor = hexColor;
+  if (updateInput && hexInput) hexInput.value = hexColor.toUpperCase();
+}
+
+function drawWheelWithIndicator(hexColor) {
+  const canvas = document.getElementById('color-wheel-canvas');
+  if (!canvas) return;
+
+  drawColorWheel();
+
+  const hsl = hexToHsl(hexColor);
+  const cx = canvas.width / 2;
+  const cy = canvas.height / 2;
+  const radius = cx;
+
+  const dist = (hsl.s / 100) * radius;
+  const angleRad = hsl.h * Math.PI / 180;
+
+  const x = cx + dist * Math.cos(angleRad);
+  const y = cy + dist * Math.sin(angleRad);
+
+  const ctx = canvas.getContext('2d');
+  
+  // Outer brown ring
+  ctx.beginPath();
+  ctx.arc(x, y, 6, 0, 2 * Math.PI);
+  ctx.strokeStyle = '#4a3c31';
+  ctx.lineWidth = 2;
+  ctx.stroke();
+
+  // Inner white ring
+  ctx.beginPath();
+  ctx.arc(x, y, 4, 0, 2 * Math.PI);
+  ctx.strokeStyle = '#ffffff';
+  ctx.lineWidth = 1.5;
+  ctx.stroke();
+}
+
+function setupColorWheelEvents() {
+  const canvas = document.getElementById('color-wheel-canvas');
+  const hexInput = document.getElementById('user-color-hex');
+  if (!canvas) return;
+
+  let isDragging = false;
+
+  const handleSelection = (clientX, clientY) => {
+    const hex = getColorAtCoords(clientX, clientY);
+    if (hex) {
+      updateWheelColor(hex, true);
+      drawWheelWithIndicator(hex);
+    }
+  };
+
+  canvas.addEventListener('mousedown', (e) => {
+    isDragging = true;
+    handleSelection(e.clientX, e.clientY);
+  });
+
+  window.addEventListener('mousemove', (e) => {
+    if (isDragging) {
+      handleSelection(e.clientX, e.clientY);
+    }
+  });
+
+  window.addEventListener('mouseup', () => {
+    isDragging = false;
+  });
+
+  // Touch Support
+  canvas.addEventListener('touchstart', (e) => {
+    isDragging = true;
+    const touch = e.touches[0];
+    handleSelection(touch.clientX, touch.clientY);
+    e.preventDefault(); // Prevent page drag/scrolling
+  }, { passive: false });
+
+  window.addEventListener('touchmove', (e) => {
+    if (isDragging) {
+      const touch = e.touches[0];
+      handleSelection(touch.clientX, touch.clientY);
+      e.preventDefault(); // Prevent page drag/scrolling
+    }
+  }, { passive: false });
+
+  window.addEventListener('touchend', () => {
+    isDragging = false;
+  });
+
+  // Modal Preset colors click inside modal
   document.querySelectorAll('.modal-preset-color').forEach(btn => {
     btn.addEventListener('click', () => {
       const hex = btn.getAttribute('data-hex');
       if (hex) {
-        const hsl = hexToHsl(hex);
-        updateHslUI(hsl.h, hsl.s, hsl.l);
+        updateWheelColor(hex, true);
+        drawWheelWithIndicator(hex);
       }
     });
+  });
+
+  // HEX Input change handler
+  hexInput?.addEventListener('input', () => {
+    let val = hexInput.value.trim().toUpperCase();
+    if (val && !val.startsWith('#')) {
+      val = '#' + val;
+    }
+    if (/^#[0-9A-F]{6}$/i.test(val)) {
+      updateWheelColor(val, false);
+      drawWheelWithIndicator(val);
+    } else {
+      const preview = document.getElementById('hsl-color-preview');
+      if (preview) preview.style.backgroundColor = val;
+    }
   });
 }
 
@@ -430,7 +631,10 @@ async function handleAddCustomColor(e) {
   e.preventDefault();
 
   const hexInput = document.getElementById('user-color-hex');
-  const color = hexInput?.value.trim();
+  let color = hexInput?.value.trim();
+  if (color && !color.startsWith('#')) {
+    color = '#' + color;
+  }
 
   if (!/^#[0-9A-F]{6}$/i.test(color)) {
     showToast('รหัสสีไม่ถูกต้อง 🎨', 'error');
@@ -441,24 +645,12 @@ async function handleAddCustomColor(e) {
 
   if (editingColorIndex !== null) {
     customColors[editingColorIndex] = cleanColor;
-    saveCustomColorsToDB();
+    await saveCustomColorsToDB();
 
     selectColor(cleanColor);
     showToast('แก้ไขสีกระดาษเรียบร้อย! ✨', 'success');
     closeColorModal();
-
-    const modifiedIndex = editingColorIndex;
     editingColorIndex = null;
-    
-    setTimeout(() => {
-      const swatches = document.querySelectorAll('.color-swatch');
-      swatches.forEach(s => s.classList.remove('scale-110', 'ring-4', 'ring-pencil/30'));
-      const customSwatches = document.querySelectorAll('.custom-swatch');
-      if (customSwatches[modifiedIndex]) {
-        customSwatches[modifiedIndex].classList.add('scale-110', 'ring-4', 'ring-pencil/30');
-      }
-    }, 50);
-
   } else {
     if (customColors.length >= 5) {
       showToast('บันทึกสีกำหนดเองได้สูงสุด 5 สีเท่านั้นครับ 🎨', 'warning');
@@ -466,20 +658,11 @@ async function handleAddCustomColor(e) {
     }
 
     customColors.push(cleanColor);
-    saveCustomColorsToDB();
+    await saveCustomColorsToDB();
 
     selectColor(cleanColor);
     showToast('บันทึกสีกำหนดเองเรียบร้อย! ✨', 'success');
     closeColorModal();
-
-    setTimeout(() => {
-      const swatches = document.querySelectorAll('.color-swatch');
-      swatches.forEach(s => s.classList.remove('scale-110', 'ring-4', 'ring-pencil/30'));
-      const newSwatch = Array.from(swatches).find(s => s.getAttribute('data-color') === cleanColor);
-      if (newSwatch) {
-        newSwatch.classList.add('scale-110', 'ring-4', 'ring-pencil/30');
-      }
-    }, 50);
   }
 }
 
@@ -490,48 +673,19 @@ function closeColorModal() {
 function setupCustomizerEvents() {
   const cardArea = document.getElementById('capture-card-area');
   const patternOverlay = document.getElementById('paper-pattern-overlay');
-  
-  const plusBtn = document.getElementById('btn-open-color-picker');
-  if (plusBtn) plusBtn.classList.remove('hidden');
-  
-  const swatches = document.querySelectorAll('.color-swatch');
-  swatches.forEach(swatch => {
-    swatch.addEventListener('click', () => {
-      swatches.forEach(s => s.classList.remove('scale-110', 'ring-4', 'ring-pencil/30'));
-      swatch.classList.add('scale-110', 'ring-4', 'ring-pencil/30');
-      
-      const color = swatch.getAttribute('data-color');
-      selectColor(color);
-    });
-  });
-  
-  if (swatches.length > 0) swatches[0].click();
+
+  // Render pencils immediately so they are visible on load
+  renderPencils();
+
+  // Load wheel and binding
+  drawColorWheel();
+  setupColorWheelEvents();
 
   const colorModal = document.getElementById('add-color-modal');
-  const openModalBtn = document.getElementById('btn-open-color-picker');
   const closeModalX = document.getElementById('btn-close-color-modal-x');
-  const closeModalBtn = document.getElementById('btn-close-color-modal');
   const addColorForm = document.getElementById('add-color-form');
 
-  setupHslListeners();
-
-  openModalBtn?.addEventListener('click', () => {
-    editingColorIndex = null;
-    const modalTitle = document.getElementById('color-modal-title');
-    const submitBtn = document.getElementById('btn-submit-color');
-
-    if (modalTitle) modalTitle.textContent = '🎨 ผสมสีกระดาษใหม่';
-    if (submitBtn) submitBtn.textContent = 'บันทึกสีนี้ 💾';
-
-    const defaultColor = '#fffefb';
-    const hsl = hexToHsl(defaultColor);
-    updateHslUI(hsl.h, hsl.s, hsl.l);
-    
-    colorModal?.classList.remove('hidden');
-  });
-
   closeModalX?.addEventListener('click', closeColorModal);
-  closeModalBtn?.addEventListener('click', closeColorModal);
   addColorForm?.addEventListener('submit', handleAddCustomColor);
 
   // Close Mobile Download modal listeners
@@ -551,21 +705,18 @@ function setupCustomizerEvents() {
       });
       btn.classList.add('btn-yellow');
       btn.classList.remove('btn-cream');
-      
+
       const pattern = btn.getAttribute('data-pattern');
-      const spiralRings = document.getElementById('paper-spiral-rings');
-      
+
       if (patternOverlay) {
-        patternOverlay.classList.remove('pattern-lined', 'pattern-grid', 'pattern-dotted', 'pattern-spiral');
-        cardArea?.classList.remove('pattern-spiral-pad');
-        if (spiralRings) spiralRings.classList.add('hidden');
-        
+        // Remove all pattern classes
+        patternOverlay.classList.remove(
+          'pattern-lined', 'pattern-grid', 'pattern-wood-frame',
+          'pattern-washi-tape', 'pattern-botanical', 'pattern-ticket', 'pattern-sparkles'
+        );
+
         if (pattern !== 'plain') {
           patternOverlay.classList.add(`pattern-${pattern}`);
-          if (pattern === 'spiral') {
-            cardArea?.classList.add('pattern-spiral-pad');
-            if (spiralRings) spiralRings.classList.remove('hidden');
-          }
         }
       }
     });
@@ -582,6 +733,9 @@ function setupCustomizerEvents() {
       navigate('/');
     }
   });
+
+  // Select initial default color
+  selectColor('#fffefb');
 }
 
 function downloadCardAsPNG() {
