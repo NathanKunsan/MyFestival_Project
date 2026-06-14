@@ -195,14 +195,14 @@ export const init = async () => {
       enableTime: false,
       dateFormat: "Y-m-d",
       altInput: true,
-      altFormat: "d/m/Y",
+      altFormat: "j F",
       locale: "th"
     });
     window.flatpickr('#fest-end', {
       enableTime: false,
       dateFormat: "Y-m-d",
       altInput: true,
-      altFormat: "d/m/Y",
+      altFormat: "j F",
       locale: "th"
     });
   }
@@ -1056,8 +1056,8 @@ function renderAdminFestivalsList(festivals) {
     const isAnnual = f.description && f.description.startsWith('[ประจำปี]');
     const cleanDesc = isAnnual ? f.description.replace('[ประจำปี]', '').trim() : f.description;
     
-    const startStr = new Date(f.start_date).toLocaleDateString('th-TH');
-    const endStr = new Date(f.end_date).toLocaleDateString('th-TH');
+    const startStr = new Date(f.start_date).toLocaleDateString('th-TH', { month: 'short', day: 'numeric' });
+    const endStr = new Date(f.end_date).toLocaleDateString('th-TH', { month: 'short', day: 'numeric' });
     const dateRangeStr = isAnnual ? `${startStr} ถึง ${endStr} (ประจำปี)` : `${startStr} ถึง ${endStr}`;
     
     return `
@@ -2109,7 +2109,7 @@ function renderSuggestionsQueue(suggestions) {
         
         <div class="space-y-2">
           <p class="text-lg font-extrabold text-wood-orange">🎪 ชื่อที่เสนอ: ${sug.name}</p>
-          <p class="text-xs text-pencil-light font-bold">🗓️ ช่วงเวลาที่เสนอ: ${sug.start_date ? new Date(sug.start_date).toLocaleDateString('th-TH') : 'ไม่ได้ระบุ'} ถึง ${sug.end_date ? new Date(sug.end_date).toLocaleDateString('th-TH') : 'ไม่ได้ระบุ'}</p>
+          <p class="text-xs text-pencil-light font-bold">🗓️ ช่วงเวลาที่เสนอ: ${sug.start_date ? new Date(sug.start_date).toLocaleDateString('th-TH', { month: 'short', day: 'numeric' }) : 'ไม่ได้ระบุ'} ถึง ${sug.end_date ? new Date(sug.end_date).toLocaleDateString('th-TH', { month: 'short', day: 'numeric' }) : 'ไม่ได้ระบุ'}</p>
           <p class="text-sm font-bold text-pencil-light">📝 คำอธิบาย: ${sug.description}</p>
           ${sug.image_url ? `
           <div class="my-2 border-2 border-pencil rounded-lg overflow-hidden max-w-xs bg-pencil-soft/10">
