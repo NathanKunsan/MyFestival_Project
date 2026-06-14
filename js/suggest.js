@@ -182,7 +182,11 @@ function setupFormSubmit(supabase, role) {
     e.preventDefault();
     
     const name = document.getElementById('suggest-name-input').value.trim();
-    const desc = document.getElementById('suggest-desc-input').value.trim();
+    let desc = document.getElementById('suggest-desc-input').value.trim();
+    const isAnnual = document.getElementById('suggest-annual-checkbox')?.checked || false;
+    if (isAnnual) {
+      desc = `[ประจำปี] ${desc}`;
+    }
     let wish = document.getElementById('suggest-wish-input')?.value.trim();
     
     // Assign fallback wish value for members
