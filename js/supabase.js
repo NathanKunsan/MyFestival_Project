@@ -24,3 +24,34 @@ export const getSupabase = () => {
     return null;
   }
 };
+
+// Parse tags from message_text (stored in format: [Text]\n\n__TAGS__:tag1,tag2)
+export function parseMessageTags(msg) {
+  if (!msg) return msg;
+  if (typeof msg.message_text === 'string') {
+    const markers = ['__TAGS__:', '__TAGSUIUI__:', '__TAGSUI__:'];
+    for (const marker of markers) {
+      const index = msg.message_text.indexOf(marker);
+      if (index !== -1) {
+        msg.tags = msg.message_text.substring(index + marker.length).trim();
+        msg.message_text = msg.message_text.substring(0, index).trim();
+        return msg;
+      }
+    }
+  }
+  if (!msg.tags) {
+    msg.tags = '';
+  }
+  return msg;
+}
+
+// Serialize message text and tags back into message_text
+export function serializeMessageTags(text, tags) {
+  const cleanText = (text || '').trim();
+  const cleanTags = (tags || '').trim();
+  if (cleanTags) {
+    return `${cleanText}\n\n__TAGS__:${cleanTags}`;
+  }
+  return cleanText;
+}
+
