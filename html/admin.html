@@ -16,7 +16,7 @@
   <div id="page-content" class="w-full max-w-5xl mx-auto py-6">
     <div class="space-y-8">
       <div class="text-center max-w-xl mx-auto space-y-2">
-        <h1 class="text-2xl sm:text-3xl md:text-4xl font-extrabold hover-wiggle">
+        <h1 class="text-2xl sm:text-3xl md:text-4xl font-extrabold">
           🔑 <span class="scribble-highlight">ผู้ดูแลระบบ MyFestival</span>
         </h1>
         <p class="text-pencil-light text-xs sm:text-sm font-bold">
@@ -135,6 +135,14 @@
                 <div class="flex flex-col gap-1">
                   <label for="fest-end" class="font-bold text-sm">วันที่สิ้นสุดเทศกาล:</label>
                   <input type="text" id="fest-end" required readonly placeholder="คลิกเพื่อเลือกวันและเวลา... 📅" class="sketch-input w-full cursor-pointer bg-white">
+                </div>
+
+                <!-- Annual Checkbox -->
+                <div class="flex items-center gap-2 py-1">
+                  <input type="checkbox" id="fest-annual" class="accent-pencil h-4 w-4">
+                  <label for="fest-annual" class="font-bold text-sm select-none cursor-pointer">
+                    เป็นเทศกาลประจำปี (จัดขึ้นทุกปี)
+                  </label>
                 </div>
                 
                 <button type="submit" id="btn-submit-festival" class="sketch-btn btn-green w-full py-2 text-base font-bold">
