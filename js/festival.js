@@ -114,6 +114,7 @@ const getMockFestivals = () => {
 
 // Fetch all festivals and count messages
 async function fetchAndRenderFestivals(supabase) {
+  renderSkeletons();
   try {
     // Fetch festivals along with message references
     const { data, error } = await supabase
@@ -136,6 +137,36 @@ async function fetchAndRenderFestivals(supabase) {
     renderCategories();
     renderHeroSlider();
   }
+}
+
+// Render Skeleton Loading UI
+function renderSkeletons() {
+  const activeList = document.getElementById('active-list');
+  const upcomingList = document.getElementById('upcoming-list');
+  const endedList = document.getElementById('ended-list');
+  
+  const skeletonHtml = `
+    <div class="sketch-card p-4 bg-white flex flex-col justify-between min-h-[300px] animate-pulse">
+      <div>
+        <div class="relative h-40 w-full mb-3 rounded-lg border-2 border-pencil bg-pencil-soft/30"></div>
+        <div class="h-6 bg-pencil-soft/40 rounded w-3/4 mb-2 mt-1"></div>
+        <div class="h-4 bg-pencil-soft/30 rounded w-1/2 mb-4 mt-2"></div>
+        <div class="space-y-2 mt-4">
+           <div class="h-3 bg-pencil-soft/30 rounded w-full"></div>
+           <div class="h-3 bg-pencil-soft/30 rounded w-5/6"></div>
+           <div class="h-3 bg-pencil-soft/30 rounded w-4/6"></div>
+        </div>
+      </div>
+      <div class="mt-4 pt-3 border-t-2 border-pencil-soft flex gap-2">
+         <div class="h-10 bg-pencil-soft/40 rounded flex-1"></div>
+      </div>
+    </div>
+  `;
+  
+  const skeletonGroup = skeletonHtml + skeletonHtml + skeletonHtml;
+  if (activeList) activeList.innerHTML = skeletonGroup;
+  if (upcomingList) upcomingList.innerHTML = skeletonGroup;
+  if (endedList) endedList.innerHTML = skeletonGroup;
 }
 
 // Render Categorized Sections (Active, Upcoming, Ended)
