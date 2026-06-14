@@ -80,7 +80,7 @@ function setupDatePickers() {
       enableTime: false,
       dateFormat: 'Y-m-d',
       altInput: true,
-      altFormat: 'd/m/Y',
+      altFormat: 'j F',
       locale: 'th',
       defaultDate: new Date()
     });
@@ -89,7 +89,7 @@ function setupDatePickers() {
       enableTime: false,
       dateFormat: 'Y-m-d',
       altInput: true,
-      altFormat: 'd/m/Y',
+      altFormat: 'j F',
       locale: 'th',
       defaultDate: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000)
     });
