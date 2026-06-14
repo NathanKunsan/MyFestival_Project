@@ -192,16 +192,18 @@ export const init = async () => {
   // Initialize Flatpickr for custom sketchbook card-style datepicker
   if (window.flatpickr) {
     window.flatpickr('#fest-start', {
-      enableTime: true,
-      dateFormat: "Y-m-d H:i",
-      locale: "th",
-      time_24hr: true
+      enableTime: false,
+      dateFormat: "Y-m-d",
+      altInput: true,
+      altFormat: "d/m/Y",
+      locale: "th"
     });
     window.flatpickr('#fest-end', {
-      enableTime: true,
-      dateFormat: "Y-m-d H:i",
-      locale: "th",
-      time_24hr: true
+      enableTime: false,
+      dateFormat: "Y-m-d",
+      altInput: true,
+      altFormat: "d/m/Y",
+      locale: "th"
     });
   }
   
@@ -1054,8 +1056,8 @@ function renderAdminFestivalsList(festivals) {
     const isAnnual = f.description && f.description.startsWith('[ประจำปี]');
     const cleanDesc = isAnnual ? f.description.replace('[ประจำปี]', '').trim() : f.description;
     
-    const startStr = new Date(f.start_date).toLocaleString('th-TH');
-    const endStr = new Date(f.end_date).toLocaleString('th-TH');
+    const startStr = new Date(f.start_date).toLocaleDateString('th-TH');
+    const endStr = new Date(f.end_date).toLocaleDateString('th-TH');
     const dateRangeStr = isAnnual ? `${startStr} ถึง ${endStr} (ประจำปี)` : `${startStr} ถึง ${endStr}`;
     
     return `
@@ -1138,16 +1140,14 @@ async function enterEditFestivalMode(id) {
     }
   }
   
-  // Format dates for flatpickr input (YYYY-MM-DD HH:MM)
+  // Format dates for flatpickr input (YYYY-MM-DD)
   const formatDateTime = (isoStr) => {
     if (!isoStr) return '';
     const d = new Date(isoStr);
     const y = d.getFullYear();
     const m = String(d.getMonth() + 1).padStart(2, '0');
     const day = String(d.getDate()).padStart(2, '0');
-    const h = String(d.getHours()).padStart(2, '0');
-    const min = String(d.getMinutes()).padStart(2, '0');
-    return `${y}-${m}-${day} ${h}:${min}`;
+    return `${y}-${m}-${day}`;
   };
   
   document.getElementById('fest-start').value = formatDateTime(festival.start_date);
