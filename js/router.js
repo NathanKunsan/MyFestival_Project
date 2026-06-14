@@ -41,16 +41,16 @@ export async function updateProfileNotificationCount(userId) {
   if (!userId) return;
   const supabase = await getSupabase();
   if (!supabase) return;
-  
+
   try {
     const { count, error } = await supabase
       .from('notifications')
       .select('*', { count: 'exact', head: true })
       .eq('user_id', userId)
       .eq('is_read', false);
-      
+
     if (error) throw error;
-    
+
     // 1. Update Profile tab badge
     const badge = document.getElementById('profile-notif-badge');
     if (badge) {
@@ -70,13 +70,13 @@ export async function updateProfileNotificationCount(userId) {
       if (count > 0) {
         bellBadge.textContent = count;
         bellBadge.classList.remove('hidden');
-        
+
         // Trigger shake if new notifications arrived
         if (count > previousCount && bellIcon) {
           bellIcon.classList.remove('bell-shake');
           void bellIcon.offsetWidth; // Trigger reflow
           bellIcon.classList.add('bell-shake');
-          
+
           setTimeout(() => {
             bellIcon.classList.remove('bell-shake');
           }, 1000);
@@ -94,34 +94,34 @@ export async function updateProfileNotificationCount(userId) {
 export async function updateAdminNotificationCount() {
   const supabase = await getSupabase();
   if (!supabase) return;
-  
+
   try {
     // 1. Pending wishes
     const { count: msgCount } = await supabase
       .from('messages')
       .select('*', { count: 'exact', head: true })
       .eq('status', 'pending');
-      
+
     // 2. Pending revisions
     const { count: revCount } = await supabase
       .from('message_revisions')
       .select('*', { count: 'exact', head: true })
       .eq('status', 'pending');
-      
+
     // 3. Pending suggestions
     const { count: sugCount } = await supabase
       .from('festival_suggestions')
       .select('*', { count: 'exact', head: true })
       .eq('status', 'pending');
-      
+
     // 4. Pending name changes
     const { count: nameCount } = await supabase
       .from('profiles')
       .select('*', { count: 'exact', head: true })
       .not('pending_name', 'is', null);
-      
+
     const totalTasks = (msgCount || 0) + (revCount || 0) + (sugCount || 0) + (nameCount || 0);
-    
+
     const badge = document.getElementById('admin-notif-badge');
     if (badge) {
       if (totalTasks > 0) {
@@ -140,14 +140,14 @@ export async function updateAdminNotificationCount() {
 document.addEventListener('DOMContentLoaded', async () => {
   // Setup Supabase config UI
   setupConfigEvents();
-  
+
   if (!isConfigured()) {
     showConfigNeeded();
   } else {
     // Check user role on load
     await refreshAuthUI();
   }
-  
+
   // Mobile menu elements
   const mobileToggle = document.getElementById('mobile-menu-toggle');
   const mainNav = document.getElementById('main-nav');
@@ -162,13 +162,13 @@ document.addEventListener('DOMContentLoaded', async () => {
       closeIcon?.classList.toggle('hidden');
     });
   }
-  
+
   // Intercept links for SPA routing
   document.body.addEventListener('click', (e) => {
     const link = e.target.closest('a');
     if (link && link.getAttribute('href') && link.getAttribute('href').startsWith('/')) {
       e.preventDefault();
-      
+
       // Close mobile menu on redirect if open
       if (mainNav && !mainNav.classList.contains('hidden') && window.innerWidth < 1024) {
         mainNav.classList.add('hidden');
@@ -176,23 +176,37 @@ document.addEventListener('DOMContentLoaded', async () => {
         hamIcon?.classList.remove('hidden');
         closeIcon?.classList.add('hidden');
       }
-      
+
       navigate(link.getAttribute('href'));
     }
   });
 
   // Handle browser back/forward buttons & hash changes
   window.addEventListener('hashchange', () => {
-    const path = window.location.hash.slice(1) || '/';
+    let path = window.location.hash.slice(1) || '/';
+    if (path.startsWith('access_token=') || path.startsWith('error=')) {
+      if (path.includes('type=recovery')) {
+        path = '/reset-password?' + path;
+      } else {
+        path = '/';
+      }
+    }
     routePage(path);
   });
 
   // Run router for initial load
-  const initialPath = window.location.hash.slice(1) || '/';
-  
+  let initialPath = window.location.hash.slice(1) || '/';
+  if (initialPath.startsWith('access_token=') || initialPath.startsWith('error=')) {
+    if (initialPath.includes('type=recovery')) {
+      initialPath = '/reset-password?' + initialPath;
+    } else {
+      initialPath = '/';
+    }
+  }
+
   // Initialize About System modal events
   initAboutModalEvents();
-  
+
   routePage(initialPath);
 });
 
@@ -201,7 +215,7 @@ function setupConfigEvents() {
   btnOpenConfig?.addEventListener('click', () => {
     configModal.classList.remove('hidden');
   });
-  
+
   configCloseBtn?.addEventListener('click', () => {
     configModal.classList.add('hidden');
   });
@@ -297,10 +311,10 @@ export async function loadAboutInfo() {
 export function showToast(message, type = 'info') {
   const container = document.getElementById('global-toast-container');
   if (!container) return;
-  
+
   const toast = document.createElement('div');
   toast.className = 'sketch-toast';
-  
+
   let icon = 'ℹ️';
   let colorClass = 'border-pencil';
   if (type === 'success') {
@@ -313,14 +327,14 @@ export function showToast(message, type = 'info') {
     icon = '🚩';
     colorClass = 'border-pencil bg-wood-orange/20';
   }
-  
+
   toast.innerHTML = `
     <span class="text-xl">${icon}</span>
     <span class="font-bold">${message}</span>
   `;
-  
+
   container.appendChild(toast);
-  
+
   // Auto remove toast
   setTimeout(() => {
     toast.classList.add('toast-fadeOut');
@@ -349,22 +363,28 @@ function matchRoute(path) {
   if (path === '/register') {
     return { view: '/html/register.html', controller: '/js/auth.js', initName: 'initRegister', params: {} };
   }
+  if (path === '/forgot-password') {
+    return { view: '/html/forgot-password.html', controller: '/js/auth.js', initName: 'initForgotPassword', params: {} };
+  }
+  if (path === '/reset-password') {
+    return { view: '/html/reset-password.html', controller: '/js/auth.js', initName: 'initResetPassword', params: {} };
+  }
   if (['/archive', '/saved', '/profile', '/admin', '/contributor', '/suggest', '/download-card'].includes(path)) {
     return { view: `/html${path}.html`, controller: `/js${path}.js`, params: {} };
   }
-  
+
   // Default to 404
-  return { 
-    view: null, 
-    controller: null, 
+  return {
+    view: null,
+    controller: null,
     htmlContent: `
       <div class="sketch-card p-12 text-center bg-white">
         <h2 class="text-5xl font-extrabold mb-4">404 ✏️</h2>
         <p class="text-xl font-bold mb-6">ไม่พบสมุดบันทึกหน้านี้ในระบบ</p>
         <a href="/" class="sketch-btn btn-yellow">กลับหน้าแรก</a>
       </div>
-    `, 
-    params: {} 
+    `,
+    params: {}
   };
 }
 
@@ -373,7 +393,7 @@ async function routePage(fullPath) {
   // Remove previous portaled modals from body (keep global #config-modal and #about-system-modal)
   const oldModals = document.body.querySelectorAll('[id$="-modal"]:not(#config-modal):not(#about-system-modal)');
   oldModals.forEach(m => m.remove());
-  
+
   // Parse path and query parameters
   const [path, queryString] = fullPath.split('?');
   const queryParams = {};
@@ -405,7 +425,7 @@ async function routePage(fullPath) {
   const matched = matchRoute(path);
   // Merge parsed query parameters into matched params
   matched.params = { ...matched.params, ...queryParams };
-  
+
   // Guard admin and authenticated routes
   const accessDenied = checkAccessGuards(path);
   if (accessDenied) {
@@ -430,24 +450,24 @@ async function routePage(fullPath) {
       const response = await fetch(`${matched.view}?v=${new Date().getTime()}`);
       if (!response.ok) throw new Error('Failed to load view');
       let html = await response.text();
-      
+
       // Parse fetched HTML and extract #page-content if it exists
       const parser = new DOMParser();
       const doc = parser.parseFromString(html, 'text/html');
       const pageContent = doc.getElementById('page-content');
-      
+
       if (pageContent) {
         mainContent.innerHTML = pageContent.innerHTML;
       } else {
         mainContent.innerHTML = html; // fallback if no container
       }
-      
+
       // Move sub-view modals to body to solve z-index issues
       const modals = mainContent.querySelectorAll('[id$="-modal"]');
       modals.forEach(modal => {
         document.body.appendChild(modal);
       });
-      
+
       // Dynamically load controller module
       if (matched.controller) {
         const module = await import(/* @vite-ignore */ matched.controller);
@@ -460,10 +480,10 @@ async function routePage(fullPath) {
     } else {
       mainContent.innerHTML = matched.htmlContent;
     }
-    
+
     // Smooth scroll to top on routing
     window.scrollTo({ top: 0, behavior: 'smooth' });
-    
+
     // Highlight active link in Navbar
     updateNavSelection(path);
 
@@ -471,7 +491,7 @@ async function routePage(fullPath) {
     const floatingBtn = document.getElementById('btn-floating-info');
     if (floatingBtn) {
       floatingBtn.classList.remove('hidden');
-      
+
       // Auto popup on index if not dismissed forever
       if (path === '/' || path === '/festival') {
         const isDismissed = localStorage.getItem('myfestival_about_dismissed') === 'true';
@@ -501,7 +521,7 @@ async function routePage(fullPath) {
 function checkAccessGuards(path) {
   const role = currentSession.role;
   const isSystemAdmin = currentSession.user?.email === '6nathan.dev@gmail.com' || localStorage.getItem('myfestival_dev_bypass') === 'true';
-  
+
   if (path === '/admin' && role !== 'admin' && !isSystemAdmin) {
     return '/'; // Redirect admin locked pages to Home
   }
@@ -517,8 +537,8 @@ function checkAccessGuards(path) {
   if (path === '/suggest' && role === 'guest') {
     return '/login'; // Must login to suggest festival
   }
-  if (['/login', '/register'].includes(path) && role !== 'guest') {
-    return '/'; // Redirect logged in user from login/register
+  if (['/login', '/register', '/forgot-password', '/reset-password'].includes(path) && role !== 'guest') {
+    return '/'; // Redirect logged in user from auth pages
   }
   return null;
 }
@@ -526,7 +546,7 @@ function checkAccessGuards(path) {
 // Refresh Header Navigation Links based on active User roles
 export async function refreshAuthUI() {
   if (!isConfigured()) return;
-  
+
   try {
     let authStatus;
     if (localStorage.getItem('myfestival_dev_bypass') === 'true') {
@@ -539,7 +559,7 @@ export async function refreshAuthUI() {
       authStatus = await checkUserRole();
     }
     currentSession = authStatus;
-    
+
     // Subscribe to realtime updates for this user's profile and notifications
     clearNotifChannels();
     if (authStatus.user && authStatus.user.id !== 'mock-admin-id') {
@@ -556,17 +576,17 @@ export async function refreshAuthUI() {
                 console.log('User profile updated in real-time:', payload.new);
                 if (payload.new && payload.new.role !== currentSession.role) {
                   showToast(`บทบาทผู้ใช้งานของคุณถูกอัปเดตเป็น: ${payload.new.role === 'admin' ? 'Admin' : payload.new.role === 'contributor' ? 'Contributor' : 'Member'}`, 'info');
-                  
+
                   if (payload.new.role !== 'admin' && authStatus.user.email === '6nathan.dev@gmail.com') {
                     localStorage.removeItem('myfestival_admin_role_override');
                   }
-                  
+
                   await refreshAuthUI();
-                  
+
                   if (window.location.pathname === '/profile') {
                     routePage('/profile');
                   }
-                  
+
                   const accessDenied = checkAccessGuards(window.location.pathname);
                   if (accessDenied) {
                     navigate(accessDenied);
@@ -601,7 +621,7 @@ export async function refreshAuthUI() {
         const isSystemAdmin = authStatus.user.email === '6nathan.dev@gmail.com' || localStorage.getItem('myfestival_dev_bypass') === 'true';
         if (authStatus.role === 'admin' || isSystemAdmin) {
           await updateAdminNotificationCount();
-          
+
           const chanAdminMsg = supabase
             .channel('nav-admin-messages')
             .on('postgres_changes', { event: '*', schema: 'public', table: 'messages' }, async () => {
@@ -636,32 +656,32 @@ export async function refreshAuthUI() {
         }
       }
     }
-    
+
     // Display elements accordingly
     if (authStatus.role !== 'guest') {
       navLogin?.classList.add('hidden');
       navRegister?.classList.add('hidden');
       navLogout?.classList.remove('hidden');
-      
+
       navProfile?.classList.remove('hidden');
       navNotifications?.classList.remove('hidden');
       if (navUsername) navUsername.textContent = authStatus.profile?.full_name || authStatus.user.email;
       if (navAvatar && authStatus.profile?.avatar_url) {
         navAvatar.src = authStatus.profile.avatar_url;
       }
-      
+
       // Saved page
       navSaved?.classList.remove('hidden');
-      
+
       const isSystemAdmin = authStatus.user?.email === '6nathan.dev@gmail.com';
-      
+
       // Contributor dashboard
       if (['contributor', 'admin'].includes(authStatus.role) || isSystemAdmin) {
         navContributor?.classList.remove('hidden');
       } else {
         navContributor?.classList.add('hidden');
       }
-      
+
       // Admin dashboard
       if (authStatus.role === 'admin' || isSystemAdmin) {
         navAdmin?.classList.remove('hidden');
@@ -686,7 +706,7 @@ export async function refreshAuthUI() {
       navSaved?.classList.add('hidden');
       navContributor?.classList.add('hidden');
       navAdmin?.classList.add('hidden');
-      
+
       // Guest can see suggest tab (will show login alert on click)
       navSuggest?.classList.remove('hidden');
 
