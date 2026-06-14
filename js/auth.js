@@ -271,5 +271,95 @@ export const initRegister = () => {
     });
   }
 
+};
 
+export const resetPasswordForEmail = async (email) => {
+  const supabase = await getSupabase();
+  if (!supabase) throw new Error('Supabase is not configured');
+
+  const { data, error } = await supabase.auth.resetPasswordForEmail(email, {
+    redirectTo: window.location.origin
+  });
+
+  if (error) throw error;
+  return data;
+};
+
+export const updateUserPassword = async (newPassword) => {
+  const supabase = await getSupabase();
+  if (!supabase) throw new Error('Supabase is not configured');
+
+  const { data, error } = await supabase.auth.updateUser({
+    password: newPassword
+  });
+
+  if (error) throw error;
+  return data;
+};
+
+export const initForgotPassword = () => {
+  const form = document.getElementById('forgot-password-form');
+  if (form) {
+    form.addEventListener('submit', async (e) => {
+      e.preventDefault();
+      const email = document.getElementById('forgot-email').value.trim();
+      const submitBtn = form.querySelector('button[type="submit"]');
+      const originalText = submitBtn.textContent;
+      submitBtn.disabled = true;
+      submitBtn.textContent = 'กำลังส่งอีเมล... ✉️';
+
+      try {
+        const { showToast } = await import('./router.js');
+        await resetPasswordForEmail(email);
+        showToast('ส่งลิงก์สำหรับตั้งรหัสผ่านใหม่แล้ว กรุณาตรวจสอบอีเมลของคุณ', 'success');
+        document.getElementById('forgot-email').value = '';
+      } catch (error) {
+        const { showToast } = await import('./router.js');
+        showToast(error.message || 'เกิดข้อผิดพลาดในการส่งอีเมล', 'error');
+      } finally {
+        submitBtn.disabled = false;
+        submitBtn.textContent = originalText;
+      }
+    });
+  }
+};
+
+export const initResetPassword = () => {
+  const form = document.getElementById('reset-password-form');
+  if (form) {
+    form.addEventListener('submit', async (e) => {
+      e.preventDefault();
+      const password = document.getElementById('reset-password').value;
+      const confirmPassword = document.getElementById('reset-password-confirm').value;
+
+      const { showToast, navigate } = await import('./router.js');
+
+      if (password !== confirmPassword) {
+        showToast('รหัสผ่านและการยืนยันรหัสผ่านไม่ตรงกัน', 'error');
+        return;
+      }
+
+      if (password.length < 8) {
+        showToast('กรุณากรอกรหัสผ่านอย่างน้อย 8 ตัวอักษร', 'warning');
+        return;
+      }
+
+      const submitBtn = form.querySelector('button[type="submit"]');
+      const originalText = submitBtn.textContent;
+      submitBtn.disabled = true;
+      submitBtn.textContent = 'กำลังอัปเดตรหัสผ่าน... ✅';
+
+      try {
+        await updateUserPassword(password);
+        showToast('เปลี่ยนรหัสผ่านสำเร็จแล้ว! กรุณาเข้าสู่ระบบด้วยรหัสผ่านใหม่', 'success');
+        setTimeout(() => {
+          navigate('/login');
+        }, 2000);
+      } catch (error) {
+        showToast(error.message || 'เกิดข้อผิดพลาดในการเปลี่ยนรหัสผ่าน', 'error');
+        submitBtn.disabled = false;
+        submitBtn.textContent = originalText;
+      }
+    });
+  }
 };
