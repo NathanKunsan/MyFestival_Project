@@ -37,14 +37,9 @@ function setupGlobalLockEvents() {
     mainEl.dataset.lockListenersBound = 'true';
     mainEl.addEventListener('click', (e) => {
       const upcomingBtn = e.target.closest('.btn-upcoming-lock');
-      const endedBtn = e.target.closest('.btn-ended-lock');
-      
       if (upcomingBtn) {
         e.preventDefault();
         showToast('เทศกาลนี้ยังไม่เริ่มจัดงาน ไม่สามารถสุ่มคำอวยพรได้ครับ ⏳', 'warning');
-      } else if (endedBtn) {
-        e.preventDefault();
-        showToast('เทศกาลนี้ได้สิ้นสุดลงแล้ว ไม่สามารถสุ่มคำอวยพรได้ครับ 💾', 'warning');
       }
     });
   }
@@ -256,9 +251,9 @@ function createFestivalCard(festival, approvedCount) {
                ⏳ ยังไม่เริ่มจัดงาน
              </button>`
           : endDate < new Date()
-            ? `<button class="sketch-btn btn-cream text-sm flex-1 text-center py-1.5 justify-center opacity-60 btn-ended-lock">
-                 💾 สิ้นสุดเทศกาลแล้ว
-               </button>`
+            ? `<a href="/message/${festival.id}" class="sketch-btn btn-cream text-sm flex-1 text-center py-1.5 justify-center">
+                 💾 สุ่มอ่านคำอวยพรย้อนหลัง
+               </a>`
             : `<a href="/message/${festival.id}" class="sketch-btn btn-yellow text-sm flex-1 text-center py-1.5 justify-center">
                  🎲 สุ่มรับคำอวยพร
                </a>`
@@ -356,9 +351,9 @@ function updateSliderContent() {
                  ⏳ ยังไม่เริ่ม
                </button>`
             : endDate < now
-              ? `<button class="sketch-btn btn-cream py-2.5 px-6 opacity-60 text-lg btn-ended-lock">
-                   💾 สิ้นสุดเทศกาลแล้ว
-                 </button>`
+              ? `<a href="/message/${festival.id}" class="sketch-btn btn-cream py-2.5 px-6 text-lg">
+                   💾 สุ่มอ่านคำอวยพรย้อนหลัง
+                 </a>`
               : `<a href="/message/${festival.id}" class="sketch-btn btn-yellow text-lg py-2.5 px-6">
                    🎲 สุ่มคำอวยพร
                  </a>`
