@@ -16,10 +16,6 @@ export const initChatWidget = async (user, profile) => {
   if (!user) return;
   activeUser = { id: user.id, email: user.email, full_name: profile?.full_name || user.email.split('@')[0] };
 
-  // If the user email is the developer, we don't display the user widget (they have the admin dashboard)
-  if (user.email === '6nathan.dev@gmail.com') {
-    return; 
-  }
 
   const supabase = await getSupabase();
   if (supabase) {
