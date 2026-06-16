@@ -20,14 +20,10 @@ function setupLockEvents() {
     grid.dataset.listenerAttached = 'true';
     grid.addEventListener('click', (e) => {
       const upcomingBtn = e.target.closest('.btn-upcoming-lock');
-      const endedBtn = e.target.closest('.btn-ended-lock');
       
       if (upcomingBtn) {
         e.preventDefault();
         showToast('เทศกาลนี้ยังไม่เริ่มจัดงาน ไม่สามารถสุ่มคำอวยพรได้ครับ ⏳', 'warning');
-      } else if (endedBtn) {
-        e.preventDefault();
-        showToast('เทศกาลนี้ได้สิ้นสุดลงแล้ว ไม่สามารถสุ่มคำอวยพรได้ครับ 💾', 'warning');
       }
     });
   }
@@ -203,9 +199,9 @@ function renderArchiveList(list) {
                    ⏳ ยังไม่เริ่มจัดงาน
                  </button>`
               : endDate < now
-                ? `<button class="sketch-btn btn-cream text-xs py-1 px-3 opacity-60 btn-ended-lock">
-                     💾 สิ้นสุดเทศกาลแล้ว
-                   </button>`
+                ? `<a href="/message/${festival.id}" class="sketch-btn btn-cream text-xs py-1 px-3">
+                    💾 สุ่มอ่านคำอวยพรย้อนหลัง
+                  </a>`
                 : `<a href="/message/${festival.id}" class="sketch-btn btn-yellow text-xs py-1 px-3">
                      🎲 สุ่มรับคำอวยพร
                    </a>`
