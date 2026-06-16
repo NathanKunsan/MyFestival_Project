@@ -47,8 +47,7 @@ export const init = async (params) => {
         return;
       }
       if (endDate < now) {
-        renderErrorState('เทศกาลนี้ได้สิ้นสุดลงแล้ว ไม่สามารถสุ่มคำอวยพรได้ครับ 💾');
-        return;
+        showToast('เทศกาลนี้สิ้นสุดแล้ว สามารถสุ่มอ่านคำอวยพรย้อนหลังได้ครับ 💾', 'info');
       }
       document.getElementById('festival-title').textContent = `🎈 ${festival.name}`;
       await drawRandomMessage(festival.id);
@@ -309,11 +308,7 @@ async function renderMessageCard() {
 
   const drawRandomBtn = document.getElementById('btn-draw-random');
   if (drawRandomBtn) {
-    if (currentFestival && new Date(currentFestival.end_date) < new Date()) {
-      drawRandomBtn.classList.add('hidden');
-    } else {
-      drawRandomBtn.classList.remove('hidden');
-    }
+    drawRandomBtn.classList.remove('hidden');
   }
 
   // Load interaction metrics
