@@ -489,7 +489,16 @@ function setupInteractiveEvents() {
   });
 
   // 1.5 Filter tags input listener
-  document.getElementById('tag-filter-input')?.addEventListener('input', async () => {
+  const tagFilterInput = document.getElementById('tag-filter-input');
+  if (tagFilterInput) {
+    tagFilterInput.addEventListener('keydown', async (e) => {
+      if (e.key === 'Enter' && currentFestival) {
+        await drawRandomMessage(currentFestival.id);
+      }
+    });
+  }
+
+  document.getElementById('btn-filter-submit')?.addEventListener('click', async () => {
     if (currentFestival) {
       await drawRandomMessage(currentFestival.id);
     }
@@ -647,6 +656,7 @@ function renderErrorState(message) {
   }
 }
 
+// Render empty state
 function renderEmptyState() {
   const container = document.getElementById('message-container');
   const controls = document.getElementById('message-controls');
@@ -729,8 +739,8 @@ function updateTagsGuide(tagsList) {
         const tagFilterInput = document.getElementById('tag-filter-input');
         if (tagFilterInput) {
           tagFilterInput.value = btn.getAttribute('data-tag');
-          // Trigger input event to filter wishes
-          tagFilterInput.dispatchEvent(new Event('input'));
+          // Click the search button programmatically to trigger filter
+          document.getElementById('btn-filter-submit')?.click();
         }
       });
     });
@@ -779,4 +789,3 @@ async function fetchAndPopulateTagsGuide(festivalId) {
     updateTagsGuide(Array.from(uniqueTags));
   }
 }
-
