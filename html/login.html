@@ -74,9 +74,12 @@
             <input type="email" id="login-email" required placeholder="example@email.com" class="sketch-input w-full">
           </div>
 
-          <div class="flex flex-col gap-1">
+          <div class="flex flex-col gap-1 relative">
             <label for="login-password" class="font-bold text-sm">รหัสผ่าน (Password):</label>
-            <input type="password" id="login-password" required placeholder="••••••••" class="sketch-input w-full">
+            <div class="relative w-full">
+              <input type="password" id="login-password" required placeholder="••••••••" class="sketch-input w-full pr-14">
+              <button type="button" id="btn-toggle-password" class="absolute right-4 top-1/2 -translate-y-1/2 text-pencil-light hover:text-pencil font-bold text-sm select-none p-1 transition-colors">👁️</button>
+            </div>
           </div>
 
           <button type="submit" class="sketch-btn btn-yellow w-full py-2.5 mt-2 text-lg">
