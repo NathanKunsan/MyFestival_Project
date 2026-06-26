@@ -204,6 +204,21 @@ export const initLogin = () => {
   const form = document.getElementById('login-form');
 
   if (form) {
+    // Password toggle visibility
+    const btnTogglePassword = document.getElementById('btn-toggle-password');
+    const passwordInput = document.getElementById('login-password');
+    if (btnTogglePassword && passwordInput) {
+      btnTogglePassword.addEventListener('click', () => {
+        if (passwordInput.type === 'password') {
+          passwordInput.type = 'text';
+          btnTogglePassword.textContent = '🙈';
+        } else {
+          passwordInput.type = 'password';
+          btnTogglePassword.textContent = '👁️';
+        }
+      });
+    }
+
     form.addEventListener('submit', async (e) => {
       e.preventDefault();
       const email = document.getElementById('login-email').value.trim();
@@ -229,14 +244,27 @@ export const initLogin = () => {
       }
     });
   }
-
-
 };
 
 export const initRegister = () => {
   const form = document.getElementById('register-form');
 
   if (form) {
+    // Password toggle visibility
+    const btnTogglePassword = document.getElementById('btn-toggle-password');
+    const passwordInput = document.getElementById('register-password');
+    if (btnTogglePassword && passwordInput) {
+      btnTogglePassword.addEventListener('click', () => {
+        if (passwordInput.type === 'password') {
+          passwordInput.type = 'text';
+          btnTogglePassword.textContent = '🙈';
+        } else {
+          passwordInput.type = 'password';
+          btnTogglePassword.textContent = '👁️';
+        }
+      });
+    }
+
     form.addEventListener('submit', async (e) => {
       e.preventDefault();
       const name = document.getElementById('register-name').value.trim();
@@ -270,5 +298,4 @@ export const initRegister = () => {
       }
     });
   }
-
 };
